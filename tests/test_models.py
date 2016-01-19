@@ -549,3 +549,17 @@ class ModelsTest(BaseTest):
 
         plugin = add_plugin(post1.content, 'BlogArchivePlugin', language='en', app_config=self.app_config_1)
         self.assertEqual(force_text(plugin.__str__()), 'generic blog plugin')
+
+    def test_category_main_image(self):
+        category = BlogCategory.objects.create(name='category with image', app_config=self.app_config_1)
+        category.save()
+        self.assertIsNone(category.main_image)
+
+        image = category.main_image = self.create_filer_image_object()
+        category.save()
+        category_from_db = BlogCategory.objects.get(id=category.pk)
+        self.assertEqual(category_from_db.main_image, image)
+
+        image.delete()
+        category_from_db = BlogCategory.objects.get(id=category.pk)
+        self.assertIsNone(category_from_db.main_image)
