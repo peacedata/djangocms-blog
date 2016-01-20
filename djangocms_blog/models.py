@@ -34,6 +34,9 @@ class BlogCategory(TranslatableModel):
     parent = models.ForeignKey('self', verbose_name=_('parent'), null=True, blank=True)
     date_created = models.DateTimeField(_('created at'), auto_now_add=True)
     date_modified = models.DateTimeField(_('modified at'), auto_now=True)
+    main_image = FilerImageField(verbose_name=_('main image'), blank=True, null=True,
+                                 on_delete=models.SET_NULL,
+                                 related_name='djangocms_blog_category_image')
     app_config = AppHookConfigField(
         BlogConfig, null=True, verbose_name=_('app. config')
     )
