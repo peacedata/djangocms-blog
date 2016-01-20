@@ -7,7 +7,6 @@ from tempfile import mkdtemp
 
 def gettext(s): return s
 
-
 HELPER_SETTINGS = dict(
     ROOT_URLCONF='tests.test_utils.urls',
     INSTALLED_APPS=[
