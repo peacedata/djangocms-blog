@@ -57,6 +57,14 @@ class BlogCategory(TranslatableModel):
     def count(self):
         return self.blog_posts.namespace(self.app_config.namespace).published().count()
 
+    @staticmethod
+    def get_sub_category_ids(category):
+        ids = []
+        for sub_category_id in BlogCategory.objects.filter(parent_id=category.pk).only('id'):
+            ids.append(sub_category_id)
+            ids.extend(BlogCategory.get_sub_category_ids(sub_category_id))
+        return ids
+
     def get_absolute_url(self, lang=None):
         if not lang:
             lang = get_language()
