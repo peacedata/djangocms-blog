@@ -185,7 +185,9 @@ class CategoryEntriesView(BaseBlogView, ListView):
     def get_queryset(self):
         qs = super(CategoryEntriesView, self).get_queryset()
         if 'category' in self.kwargs:
-            qs = qs.filter(categories=self.category.pk)
+            categories = BlogCategory.get_sub_category_ids(self.category)
+            categories.append(self.category.pk)
+            qs = qs.filter(categories__in=categories)
         return qs
 
     def get_context_data(self, **kwargs):
