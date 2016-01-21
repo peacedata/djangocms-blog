@@ -12,6 +12,7 @@ from django.utils.encoding import force_text, python_2_unicode_compatible
 from django.utils.html import escape, strip_tags
 from django.utils.text import slugify
 from django.utils.translation import get_language, ugettext_lazy as _
+from django_vimeo.fields import VimeoField
 from djangocms_text_ckeditor.fields import HTMLField
 from filer.fields.image import FilerImageField
 from meta_mixin.models import ModelMeta
@@ -124,6 +125,10 @@ class Post(ModelMeta, TranslatableModel):
                                         related_name='djangocms_blog_post_full',
                                         on_delete=models.SET_NULL,
                                         blank=True, null=True)
+    main_video = VimeoField(verbose_name=_('main video'), null=True, blank=True)
+    main_video_poster = FilerImageField(verbose_name=_('main video poster'), blank=True, null=True,
+                                        on_delete=models.SET_NULL,
+                                        related_name='djangocms_blog_post_video_poster')
     enable_comments = models.BooleanField(verbose_name=_('enable comments on post'),
                                           default=get_setting('ENABLE_COMMENTS'))
     sites = models.ManyToManyField('sites.Site', verbose_name=_('Site(s)'), blank=True,
