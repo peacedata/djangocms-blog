@@ -62,6 +62,10 @@ class PostAdmin(PlaceholderAdminMixin, FrontendEditableAdminMixin,
             'fields': (('main_image', 'main_image_thumbnail', 'main_image_full'),),
             'classes': ('collapse',)
         }),
+        ('Videos', {
+            'fields': (('main_video', 'main_video_poster'),),
+            'classes': ('collapse',)
+        }),
         ('SEO', {
             'fields': [('meta_description', 'meta_title', 'meta_keywords')],
             'classes': ('collapse',)
