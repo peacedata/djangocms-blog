@@ -40,7 +40,8 @@ setup(
         'django-meta-mixin>=0.2.1',
         'aldryn-apphooks-config>=0.2.6',
         'djangocms-apphook-setup',
-        'aldryn-search'
+        'aldryn-search',
+        'django-vimeo',
     ],
     license='BSD',
     zip_safe=False,
