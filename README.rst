@@ -30,7 +30,7 @@ djangocms-blog
    :target: https://codeclimate.com/github/nephila/djangocms-blog
    :alt: Code Climate
 
-A djangoCMS 3 blog application.
+django CMS blog application - Support for multilingual posts, placeholders, social network meta tags and configurable apphooks.
 
 Supported Django versions:
 
@@ -176,6 +176,9 @@ suited for your deployment.
             {'code': 'it',},
             {'code': 'fr',},
         ),
+        'default': {
+            'fallbacks': ['en', 'it', 'fr'],
+        }
     }
 
 * Add the following to your ``urls.py``::
