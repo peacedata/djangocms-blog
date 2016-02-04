@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('filer', '0002_auto_20150606_2003'),
-        ('djangocms_blog', '0013_blogcategory_main_image'),
+        ('djangocms_blog', '0014_merge'),
     ]
 
     operations = [
