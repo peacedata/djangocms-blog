@@ -27,6 +27,13 @@ from .settings import get_setting
 BLOG_CURRENT_POST_IDENTIFIER = get_setting('CURRENT_POST_IDENTIFIER')
 BLOG_CURRENT_NAMESPACE = get_setting('CURRENT_NAMESPACE')
 
+try:
+    from filer.models import ThumbnailOption  # NOQA
+    thumbnail_model = 'filer.ThumbnailOption'
+except ImportError:
+    from cmsplugin_filer_image.models import ThumbnailOption  # NOQA
+    thumbnail_model = 'cmsplugin_filer_image.ThumbnailOption'
+
 
 @python_2_unicode_compatible
 class BlogCategory(TranslatableModel):
@@ -116,12 +123,12 @@ class Post(ModelMeta, TranslatableModel):
     main_image = FilerImageField(verbose_name=_('main image'), blank=True, null=True,
                                  on_delete=models.SET_NULL,
                                  related_name='djangocms_blog_post_image')
-    main_image_thumbnail = models.ForeignKey('cmsplugin_filer_image.ThumbnailOption',
+    main_image_thumbnail = models.ForeignKey(thumbnail_model,
                                              verbose_name=_('main image thumbnail'),
                                              related_name='djangocms_blog_post_thumbnail',
                                              on_delete=models.SET_NULL,
                                              blank=True, null=True)
-    main_image_full = models.ForeignKey('cmsplugin_filer_image.ThumbnailOption',
+    main_image_full = models.ForeignKey(thumbnail_model,
                                         verbose_name=_('main image full'),
                                         related_name='djangocms_blog_post_full',
                                         on_delete=models.SET_NULL,
@@ -248,7 +255,7 @@ class Post(ModelMeta, TranslatableModel):
         return title.strip()
 
     def get_keywords(self):
-        return self.safe_translation_getter('meta_keywords').strip().split(',')
+        return self.safe_translation_getter('meta_keywords', default='').strip().split(',')
 
     def get_locale(self):
         return self.get_current_language()
@@ -261,7 +268,7 @@ class Post(ModelMeta, TranslatableModel):
 
     def get_image_full_url(self):
         if self.main_image:
-            return self.make_full_url(self.main_image.url)
+            return self.build_absolute_uri(self.main_image.url)
         return ''
 
     def get_tags(self):
@@ -292,7 +299,7 @@ class Post(ModelMeta, TranslatableModel):
             return get_setting('IMAGE_FULL_SIZE')
 
     def get_full_url(self):
-        return self.make_full_url(self.get_absolute_url())
+        return self.build_absolute_uri(self.get_absolute_url())
 
 
 class BasePostPlugin(CMSPlugin):
@@ -333,6 +340,8 @@ class LatestPostsPlugin(BasePostPlugin):
     def copy_relations(self, oldinstance):
         for tag in oldinstance.tags.all():
             self.tags.add(tag)
+        for category in oldinstance.categories.all():
+            self.categories.add(category)
 
     def get_posts(self, request):
         posts = self.post_queryset(request)

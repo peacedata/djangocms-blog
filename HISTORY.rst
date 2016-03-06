@@ -12,6 +12,10 @@ History
 * Add publish button
 * Fix issues in migrations. Thanks @skirsdeda
 * Fix selecting current menu item according to menu layout
+* Fix some issues with haystack indexes
+* Add support for moved ThumbnailOption
+* Fix Django 1.9 issues
+* Fix copy relations method in plugins
 
 0.6.3 (2015-12-22)
 ++++++++++++++++++
