@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('djangocms_blog', '0015_auto_20160408_1849'),
+        ('djangocms_blog', '0016_auto_20160215_1331'),
     ]
 
     operations = [
@@ -15,6 +15,11 @@ class Migration(migrations.Migration):
             model_name='blogcategorytranslation',
             name='slug',
             field=models.SlugField(max_length=255, verbose_name='slug', blank=True),
+        ),
+        migrations.AlterField(
+            model_name='post',
+            name='date_published',
+            field=models.DateTimeField(null=True, verbose_name='published since', blank=True),
         ),
         migrations.AlterField(
             model_name='posttranslation',

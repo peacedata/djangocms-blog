@@ -155,7 +155,7 @@ class PostAdmin(PlaceholderAdminMixin, FrontendEditableAdminMixin,
     def _set_config_defaults(self, request, form, obj=None):
         form = super(PostAdmin, self)._set_config_defaults(request, form, obj)
         sites = self.get_restricted_sites(request)
-        if 'sites' in form.base_fields and sites.exists():
+        if 'sites' in form.base_fields and sites and sites.exists():
             form.base_fields['sites'].queryset = self.get_restricted_sites(request).all()
         return form
 
@@ -205,7 +205,7 @@ class PostAdmin(PlaceholderAdminMixin, FrontendEditableAdminMixin,
     def get_queryset(self, request):
         qs = super(PostAdmin, self).get_queryset(request)
         sites = self.get_restricted_sites(request)
-        if sites.exists():
+        if sites and sites.exists():
             qs = qs.filter(sites__in=sites.all())
         return qs
 
