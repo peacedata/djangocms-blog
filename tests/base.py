@@ -3,7 +3,6 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from copy import deepcopy
 
-from cmsplugin_filer_image.models import ThumbnailOption
 from django.contrib.auth import get_user_model
 from django.contrib.sites.models import Site
 from django.core.cache import cache
@@ -14,6 +13,12 @@ from parler.utils.context import smart_override
 
 from djangocms_blog.cms_appconfig import BlogConfig
 from djangocms_blog.models import BlogCategory, Post
+
+try:
+    from filer.models import ThumbnailOption  # NOQA
+except ImportError:
+    from cmsplugin_filer_image.models import ThumbnailOption  # NOQA
+
 
 User = get_user_model()
 
@@ -117,8 +122,12 @@ class BaseTest(BaseTestCase):
             namespace='sample_app2', app_title='app2', object_name='Article'
         )
         cls.app_config_1.app_data.config.paginate_by = 1
+        cls.app_config_1.app_data.config.send_knock_create = True
+        cls.app_config_1.app_data.config.send_knock_update = True
         cls.app_config_1.save()
         cls.app_config_2.app_data.config.paginate_by = 2
+        cls.app_config_2.app_data.config.send_knock_create = True
+        cls.app_config_2.app_data.config.send_knock_update = True
         cls.app_config_2.save()
         cls.app_configs = {
             'sample_app': cls.app_config_1,

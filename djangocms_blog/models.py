@@ -1,23 +1,29 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, print_function, unicode_literals
 
+import hashlib
+
 from aldryn_apphooks_config.fields import AppHookConfigField
 from aldryn_apphooks_config.managers.parler import AppHookConfigTranslatableManager
 from cms.models import CMSPlugin, PlaceholderField
 from django.conf import settings as dj_settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.urlresolvers import reverse
 from django.db import models
+from django.db.models.signals import post_save, pre_delete
+from django.dispatch import receiver
 from django.utils import timezone
-from django.utils.encoding import force_text, python_2_unicode_compatible
+from django.utils.encoding import force_bytes, force_text, python_2_unicode_compatible
 from django.utils.html import escape, strip_tags
 from django.utils.text import slugify
 from django.utils.translation import get_language, ugettext_lazy as _
 from django_vimeo.fields import VimeoField
 from djangocms_text_ckeditor.fields import HTMLField
 from filer.fields.image import FilerImageField
-from meta_mixin.models import ModelMeta
+from meta.models import ModelMeta
 from parler.models import TranslatableModel, TranslatedFields
+from parler.utils.context import switch_language
 from taggit_autosuggest.managers import TaggableManager
 
 from .cms_appconfig import BlogConfig
@@ -33,6 +39,15 @@ try:
 except ImportError:
     from cmsplugin_filer_image.models import ThumbnailOption  # NOQA
     thumbnail_model = 'cmsplugin_filer_image.ThumbnailOption'
+
+try:
+    from knocker.mixins import KnockerModel
+except ImportError:
+    class KnockerModel(object):
+        """
+        Stub class if django-knocker is not installed
+        """
+        pass
 
 
 @python_2_unicode_compatible
@@ -52,7 +67,7 @@ class BlogCategory(TranslatableModel):
 
     translations = TranslatedFields(
         name=models.CharField(_('name'), max_length=255),
-        slug=models.SlugField(_('slug'), blank=True, db_index=True),
+        slug=models.SlugField(_('slug'), max_length=255, blank=True, db_index=True),
         meta={'unique_together': (('language_code', 'slug'),)}
     )
 
@@ -103,7 +118,7 @@ class BlogCategory(TranslatableModel):
 
 
 @python_2_unicode_compatible
-class Post(ModelMeta, TranslatableModel):
+class Post(KnockerModel, ModelMeta, TranslatableModel):
     """
     Blog post
     """
@@ -113,10 +128,8 @@ class Post(ModelMeta, TranslatableModel):
 
     date_created = models.DateTimeField(_('created'), auto_now_add=True)
     date_modified = models.DateTimeField(_('last modified'), auto_now=True)
-    date_published = models.DateTimeField(_('published since'),
-                                          default=timezone.now)
-    date_published_end = models.DateTimeField(_('published until'), null=True,
-                                              blank=True)
+    date_published = models.DateTimeField(_('published since'), null=True, blank=True)
+    date_published_end = models.DateTimeField(_('published until'), null=True, blank=True)
     publish = models.BooleanField(_('publish'), default=False)
     categories = models.ManyToManyField('djangocms_blog.BlogCategory', verbose_name=_('category'),
                                         related_name='blog_posts', blank=True)
@@ -149,7 +162,7 @@ class Post(ModelMeta, TranslatableModel):
 
     translations = TranslatedFields(
         title=models.CharField(_('title'), max_length=255),
-        slug=models.SlugField(_('slug'), blank=True, db_index=True),
+        slug=models.SlugField(_('slug'), max_length=255, blank=True, db_index=True),
         abstract=HTMLField(_('abstract'), blank=True, default=''),
         meta_description=models.TextField(verbose_name=_('post meta description'),
                                           blank=True, default=''),
@@ -204,49 +217,63 @@ class Post(ModelMeta, TranslatableModel):
     def __str__(self):
         return self.safe_translation_getter('title')
 
+    @property
+    def guid(self, language=None):
+        if not language:
+            language = self.get_current_language()
+        base_string = '{0}{2}{1}'.format(
+            language, self.app_config.namespace,
+            self.safe_translation_getter('slug', language_code=language, any_language=True)
+        )
+        return hashlib.sha256(force_bytes(base_string)).hexdigest()
+
+    def save(self, *args, **kwargs):
+        """
+        Handle some auto configuration during save
+        """
+        if self.publish and self.date_published is None:
+            self.date_published = timezone.now()
+        super(Post, self).save(*args, **kwargs)
+
+    def save_translation(self, translation, *args, **kwargs):
+        """
+        Handle some auto configuration during save
+        """
+        if not translation.slug and translation.title:
+            translation.slug = slugify(translation.title)
+        super(Post, self).save_translation(translation, *args, **kwargs)
+
     def get_absolute_url(self, lang=None):
-        if not lang:
+        if not lang or lang not in self.get_available_languages():
+            lang = self.get_current_language()
+        if not lang or lang not in self.get_available_languages():
             lang = get_language()
-        category = self.categories.first()
-        kwargs = {}
-        urlconf = get_setting('PERMALINK_URLS')[self.app_config.url_patterns]
-        if '<year>' in urlconf:
-            kwargs['year'] = self.date_published.year
-        if '<month>' in urlconf:
-            kwargs['month'] = '%02d' % self.date_published.month
-        if '<day>' in urlconf:
-            kwargs['day'] = '%02d' % self.date_published.day
-        if '<slug>' in urlconf:
-            kwargs['slug'] = self.safe_translation_getter('slug', language_code=lang, any_language=True)  # NOQA
-        if '<category>' in urlconf:
-            kwargs['category'] = category.safe_translation_getter('slug', language_code=lang, any_language=True)  # NOQA
-        return reverse('%s:post-detail' % self.app_config.namespace, kwargs=kwargs)
+        with switch_language(self, lang):
+            category = self.categories.first()
+            kwargs = {}
+            if self.date_published:
+                current_date = self.date_published
+            else:
+                current_date = self.date_created
+            urlconf = get_setting('PERMALINK_URLS')[self.app_config.url_patterns]
+            if '<year>' in urlconf:
+                kwargs['year'] = current_date.year
+            if '<month>' in urlconf:
+                kwargs['month'] = '%02d' % current_date.month
+            if '<day>' in urlconf:
+                kwargs['day'] = '%02d' % current_date.day
+            if '<slug>' in urlconf:
+                kwargs['slug'] = self.safe_translation_getter('slug', language_code=lang, any_language=True)  # NOQA
+            if '<category>' in urlconf:
+                kwargs['category'] = category.safe_translation_getter('slug', language_code=lang, any_language=True)  # NOQA
+            return reverse('%s:post-detail' % self.app_config.namespace, kwargs=kwargs)
 
     def get_meta_attribute(self, param):
         """
         Retrieves django-meta attributes from apphook config instance
         :param param: django-meta attribute passed as key
         """
-        attr = None
-        value = getattr(self.app_config, param)
-        if value:
-            attr = getattr(self, value, None)
-        if attr is not None:
-            if callable(attr):
-                try:
-                    data = attr(param)
-                except TypeError:
-                    data = attr()
-            else:
-                data = attr
-        else:
-            data = value
-        return data
-
-    def save_translation(self, translation, *args, **kwargs):
-        if not translation.slug and translation.title:
-            translation.slug = slugify(translation.title)
-        super(Post, self).save_translation(translation, *args, **kwargs)
+        return self._get_meta_value(param, getattr(self.app_config, param)) or ''
 
     def get_title(self):
         title = self.safe_translation_getter('meta_title', any_language=True)
@@ -255,6 +282,10 @@ class Post(ModelMeta, TranslatableModel):
         return title.strip()
 
     def get_keywords(self):
+        """
+        Returns the list of keywords (as python list)
+        :return: list
+        """
         return self.safe_translation_getter('meta_keywords', default='').strip().split(',')
 
     def get_locale(self):
@@ -272,10 +303,16 @@ class Post(ModelMeta, TranslatableModel):
         return ''
 
     def get_tags(self):
+        """
+        Returns the list of object tags as comma separated list
+        """
         taglist = [tag.name for tag in self.tags.all()]
         return ','.join(taglist)
 
     def get_author(self):
+        """
+        Return the author (user) objects
+        """
         return self.author
 
     def _set_default_author(self, current_user):
@@ -299,7 +336,32 @@ class Post(ModelMeta, TranslatableModel):
             return get_setting('IMAGE_FULL_SIZE')
 
     def get_full_url(self):
+        """
+        Return the url with protocol and domain url
+        """
         return self.build_absolute_uri(self.get_absolute_url())
+
+    @property
+    def is_published(self):
+        """
+        Checks wether the blog post is *really* published by checking publishing dates too
+        """
+        return (self.publish and
+                (self.date_published and self.date_published <= timezone.now()) and
+                (self.date_published_end is None or self.date_published_end > timezone.now())
+                )
+
+    def should_knock(self, created=False):
+        """
+        Returns whether to emit knocks according to the post state
+        """
+        new = (self.app_config.send_knock_create and self.is_published and
+               self.date_published == self.date_modified)
+        updated = self.app_config.send_knock_update and self.is_published
+        return new or updated
+
+    def get_cache_key(self, language, prefix):
+        return 'djangocms-blog:{2}:{0}:{1}'.format(language, self.guid, prefix)
 
 
 class BasePostPlugin(CMSPlugin):
@@ -394,3 +456,17 @@ class GenericBlogPlugin(BasePostPlugin):
 
     def __str__(self):
         return force_text(_('generic blog plugin'))
+
+
+@receiver(pre_delete, sender=Post)
+def pre_delete_post(sender, instance, **kwargs):
+    for language in instance.get_available_languages():
+        key = instance.get_cache_key(language, 'feed')
+        cache.delete(key)
+
+
+@receiver(post_save, sender=Post)
+def post_save_post(sender, instance, **kwargs):
+    for language in instance.get_available_languages():
+        key = instance.get_cache_key(language, 'feed')
+        cache.delete(key)

@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, print_function, unicode_literals
 
+import os
+
 from tempfile import mkdtemp
 
 
@@ -13,7 +15,6 @@ HELPER_SETTINGS = dict(
         'filer',
         'parler',
         'meta',
-        'meta_mixin',
         'easy_thumbnails',
         'django.contrib.sitemaps',
         'djangocms_text_ckeditor',
@@ -21,7 +22,6 @@ HELPER_SETTINGS = dict(
         'taggit',
         'taggit_autosuggest',
         'aldryn_apphooks_config',
-        'tests.test_utils',
         'aldryn_search',
     ],
     LANGUAGE_CODE='en',
@@ -73,9 +73,7 @@ HELPER_SETTINGS = dict(
             'hide_untranslated': False,
         }
     },
-    MIGRATION_MODULES={
-        'cmsplugin_filer_image': 'cmsplugin_filer_image.migrations_django',
-    },
+    MIGRATION_MODULES={},
     CMS_TEMPLATES=(
         ('blog.html', 'Blog template'),
     ),
@@ -93,9 +91,18 @@ HELPER_SETTINGS = dict(
     FILE_UPLOAD_TEMP_DIR=mkdtemp(),
     SITE_ID=1,
     HAYSTACK_CONNECTIONS={
-        "default": {}
-    }
+        'default': {}
+    },
 )
+
+try:
+    import cmsplugin_filer_image.migrations_django  # pragma: no cover # NOQA
+    HELPER_SETTINGS[
+        'MIGRATION_MODULES'
+    ]['cmsplugin_filer_image'] = 'cmsplugin_filer_image.migrations_django'
+
+except ImportError:
+    pass
 
 try:
     import admin_enhancer  # pragma: no cover # NOQA
@@ -103,10 +110,29 @@ try:
 except ImportError:
     pass
 
+try:
+    import meta_mixin  # pragma: no cover # NOQA
+    HELPER_SETTINGS['INSTALLED_APPS'].append('meta_mixin')
+except ImportError:
+    pass
+
+try:
+    import knocker  # pragma: no cover # NOQA
+    HELPER_SETTINGS['INSTALLED_APPS'].append('knocker')
+    HELPER_SETTINGS['CHANNEL_LAYERS'] = {
+        'default': {
+            'BACKEND': 'asgiref.inmemory.ChannelLayer',
+            'ROUTING': 'knocker.routing.channel_routing',
+        },
+    }
+except ImportError:
+    pass
+os.environ['AUTH_USER_MODEL'] = 'tests.test_utils.CustomUser'
+
 
 def run():
     from djangocms_helper import runner
     runner.cms('djangocms_blog')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     run()

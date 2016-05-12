@@ -2,7 +2,9 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import re
+from contextlib import contextmanager
 from copy import deepcopy
+from datetime import timedelta
 
 import parler
 from cms.api import add_plugin
@@ -18,13 +20,27 @@ from django.utils.html import strip_tags
 from django.utils.timezone import now
 from django.utils.translation import get_language, override
 from djangocms_helper.utils import CMS_30
+from menus.menu_pool import menu_pool
+from parler.utils.context import smart_override
 from taggit.models import Tag
 
 from djangocms_blog.cms_appconfig import BlogConfig, BlogConfigForm
 from djangocms_blog.models import BlogCategory, Post
-from djangocms_blog.settings import get_setting
+from djangocms_blog.settings import MENU_TYPE_NONE, get_setting
 
 from .base import BaseTest
+
+try:
+    from unittest import SkipTest
+except ImportError:
+    from django.utils.unittest import SkipTest
+
+try:
+    from knocker.signals import pause_knocks
+except ImportError:
+    @contextmanager
+    def pause_knocks(obj):
+        yield
 
 
 class AdminTest(BaseTest):
@@ -44,12 +60,12 @@ class AdminTest(BaseTest):
 
         # Add view only contains the apphook selection widget
         response = post_admin.add_view(request)
-        self.assertNotContains(response, '<input id="id_slug" maxlength="50" name="slug" type="text"')
+        self.assertNotContains(response, '<input id="id_slug" maxlength="255" name="slug" type="text"')
         self.assertContains(response, '<option value="%s">Blog / sample_app</option>' % self.app_config_1.pk)
 
         # Changeview is 'normal'
         response = post_admin.change_view(request, str(post.pk))
-        self.assertContains(response, '<input id="id_slug" maxlength="50" name="slug" type="text" value="first-post" />')
+        self.assertContains(response, '<input id="id_slug" maxlength="255" name="slug" type="text" value="first-post" />')
         self.assertContains(response, '<option value="%s" selected="selected">Blog / sample_app</option>' % self.app_config_1.pk)
 
         # Test for publish view
@@ -148,12 +164,16 @@ class AdminTest(BaseTest):
             fsets = post_admin.get_fieldsets(request)
             self.assertFalse('sites' in fsets[1][1]['fields'][0])
 
-        request = self.get_page_request('/', self.user, r'/en/blog/?app_config=%s' % self.app_config_1.pk, edit=False)
+        request = self.get_page_request(
+            '/', self.user, r'/en/blog/?app_config=%s' % self.app_config_1.pk, edit=False
+        )
         fsets = post_admin.get_fieldsets(request)
         self.assertTrue('author' in fsets[1][1]['fields'][0])
 
         with self.login_user_context(self.user):
-            request = self.get_request('/', 'en', user=self.user, path=r'/en/blog/?app_config=%s' % self.app_config_1.pk)
+            request = self.get_request(
+                '/', 'en', user=self.user, path=r'/en/blog/?app_config=%s' % self.app_config_1.pk
+            )
             msg_mid = MessageMiddleware()
             msg_mid.process_request(request)
             post_admin = admin.site._registry[Post]
@@ -161,6 +181,43 @@ class AdminTest(BaseTest):
             self.assertContains(response, '<option value="%s">%s</option>' % (
                 self.category_1.pk, self.category_1.safe_translation_getter('name', language_code='en')
             ))
+            self.assertContains(response, 'id="id_sites" name="sites"')
+
+        self.user.sites.add(self.site_1)
+        with self.login_user_context(self.user):
+            request = self.get_request('/', 'en', user=self.user,
+                                       path=r'/en/blog/?app_config=%s' % self.app_config_1.pk)
+            msg_mid = MessageMiddleware()
+            msg_mid.process_request(request)
+            post_admin = admin.site._registry[Post]
+            post_admin._sites = None
+            response = post_admin.add_view(request)
+            response.render()
+            self.assertNotContains(response, 'id="id_sites" name="sites"')
+            post_admin._sites = None
+        self.user.sites.clear()
+
+    def test_admin_queryset(self):
+        posts = self.get_posts()
+        posts[0].sites.add(self.site_1)
+        posts[1].sites.add(self.site_2)
+
+        request = self.get_request('/', 'en', user=self.user,
+                                   path=r'/en/blog/?app_config=%s' % self.app_config_1.pk)
+        post_admin = admin.site._registry[Post]
+        post_admin._sites = None
+        qs = post_admin.get_queryset(request)
+        self.assertEqual(qs.count(), 4)
+
+        self.user.sites.add(self.site_2)
+        request = self.get_request('/', 'en', user=self.user,
+                                   path=r'/en/blog/?app_config=%s' % self.app_config_1.pk)
+        post_admin = admin.site._registry[Post]
+        post_admin._sites = None
+        qs = post_admin.get_queryset(request)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(qs[0], posts[1])
+        self.user.sites.clear()
 
     def test_admin_auto_author(self):
         pages = self.get_pages()
@@ -219,33 +276,67 @@ class AdminTest(BaseTest):
         post_admin = admin.site._registry[Post]
         request = self.get_page_request('/', self.user_normal, r'/en/blog/?app_config=%s' % self.app_config_1.pk)
 
+        post_admin._sites = None
         fsets = post_admin.get_fieldsets(request)
         self.assertFalse('author' in fsets[1][1]['fields'][0])
+        self.assertTrue('sites' in fsets[1][1]['fields'][0])
+        post_admin._sites = None
 
         def filter_function(fs, request, obj=None):
             if request.user == self.user_normal:
                 fs[1][1]['fields'][0].append('author')
             return fs
 
+        self.user_normal.sites.add(self.site_1)
+        request = self.get_page_request('/', self.user_normal, r'/en/blog/?app_config=%s' % self.app_config_1.pk)
+        post_admin._sites = None
         with self.settings(BLOG_ADMIN_POST_FIELDSET_FILTER=filter_function):
             fsets = post_admin.get_fieldsets(request)
             self.assertTrue('author' in fsets[1][1]['fields'][0])
+            self.assertFalse('sites' in fsets[1][1]['fields'][0])
+        post_admin._sites = None
+        self.user_normal.sites.clear()
 
     def test_admin_post_text(self):
         pages = self.get_pages()
         post = self._get_post(self._post_data[0]['en'])
 
-        with self.login_user_context(self.user):
-            with self.settings(BLOG_USE_PLACEHOLDER=False):
-                data = {'post_text': 'ehi text', 'title': 'some title'}
-                request = self.post_request(pages[0], 'en', user=self.user, data=data, path='/en/?edit_fields=post_text')
+        with pause_knocks(post):
+            with self.login_user_context(self.user):
+                with self.settings(BLOG_USE_PLACEHOLDER=False):
+                    data = {'post_text': 'ehi text', 'title': 'some title'}
+                    request = self.post_request(pages[0], 'en', user=self.user, data=data, path='/en/?edit_fields=post_text')
+                    msg_mid = MessageMiddleware()
+                    msg_mid.process_request(request)
+                    post_admin = admin.site._registry[Post]
+                    response = post_admin.edit_field(request, post.pk, 'en')
+                    self.assertEqual(response.status_code, 200)
+                    modified_post = Post.objects.language('en').get(pk=post.pk)
+                    self.assertEqual(modified_post.safe_translation_getter('post_text'), data['post_text'])
+
+    def test_admin_clear_menu(self):
+        """
+        Tests that after changing apphook config menu structure the menu content is different: new
+        value is taken immediately into account
+        """
+        pages = self.get_pages()
+        post = self._get_post(self._post_data[0]['en'])
+
+        request = self.get_page_request(None, self.user, r'/en/page-two/')
+        first_nodes = menu_pool.get_nodes(request)
+        with pause_knocks(post):
+            with self.login_user_context(self.user):
+                data = dict(namespace='sample_app', app_title='app1', object_name='Blog')
+                data['config-menu_structure'] = MENU_TYPE_NONE
+                data['config-sitemap_changefreq'] = 'weekly'
+                data['config-sitemap_priority'] = '0.5'
+                request = self.post_request(pages[0], 'en', user=self.user, data=data)
                 msg_mid = MessageMiddleware()
                 msg_mid.process_request(request)
-                post_admin = admin.site._registry[Post]
-                response = post_admin.edit_field(request, post.pk, 'en')
-                self.assertEqual(response.status_code, 200)
-                modified_post = Post.objects.language('en').get(pk=post.pk)
-                self.assertEqual(modified_post.safe_translation_getter('post_text'), data['post_text'])
+                config_admin = admin.site._registry[BlogConfig]
+                response = config_admin.change_view(request, str(self.app_config_1.pk))
+                second_nodes = menu_pool.get_nodes(request)
+                self.assertNotEqual(len(first_nodes), len(second_nodes))
 
 
 class ModelsTest(BaseTest):
@@ -259,6 +350,7 @@ class ModelsTest(BaseTest):
         post = self._get_post(self._post_data[0]['en'])
         post = self._get_post(self._post_data[0]['it'], post, 'it')
         post.main_image = self.create_filer_image_object()
+        post.publish = True
         post.save()
         post.set_current_language('en')
         meta_en = post.as_meta()
@@ -335,6 +427,47 @@ class ModelsTest(BaseTest):
         post.meta_title = 'meta title'
         self.assertEqual(post.get_title(), 'meta title')
 
+        # Assess is_published property
+        post.publish = False
+        post.save()
+        self.assertFalse(post.is_published)
+
+        post.publish = True
+        post.date_published = now() + timedelta(days=1)
+        post.date_published_end = None
+        post.save()
+        self.assertFalse(post.is_published)
+
+        post.publish = True
+        post.date_published = now() - timedelta(days=1)
+        post.date_published_end = now() - timedelta(minutes=1)
+        post.save()
+        self.assertFalse(post.is_published)
+
+        post.publish = True
+        post.date_published = now() - timedelta(days=1)
+        post.date_published_end = None
+        post.save()
+        self.assertTrue(post.is_published)
+
+        post.publish = True
+        post.date_published = now() - timedelta(days=1)
+        post.date_published_end = now() + timedelta(minutes=1)
+        post.save()
+        self.assertTrue(post.is_published)
+
+        post.publish = False
+        post.date_published = now() - timedelta(days=1)
+        post.date_published_end = None
+        post.save()
+        self.assertFalse(post.is_published)
+
+        post.publish = False
+        post.date_published = now() - timedelta(days=1)
+        post.date_published_end = now() + timedelta(minutes=1)
+        post.save()
+        self.assertFalse(post.is_published)
+
     def test_urls(self):
         self.get_pages()
         post = self._get_post(self._post_data[0]['en'])
@@ -374,6 +507,7 @@ class ModelsTest(BaseTest):
         self.assertTrue(re.match(r'.*/%s/$' % post.slug, post.get_absolute_url()))
 
     def test_manager(self):
+        self.get_pages()
         post1 = self._get_post(self._post_data[0]['en'])
         post2 = self._get_post(self._post_data[1]['en'])
 
@@ -553,6 +687,7 @@ class ModelsTest(BaseTest):
                 self.assertEqual(set(list(Post.objects.all().on_site())), set([post2, post3]))
 
     def test_str_repr(self):
+        self.get_pages()
         post1 = self._get_post(self._post_data[0]['en'])
         post1.meta_description = ''
         post1.main_image = None
@@ -574,16 +709,83 @@ class ModelsTest(BaseTest):
         plugin = add_plugin(post1.content, 'BlogArchivePlugin', language='en', app_config=self.app_config_1)
         self.assertEqual(force_text(plugin.__str__()), 'generic blog plugin')
 
-    def test_category_main_image(self):
-        category = BlogCategory.objects.create(name='category with image', app_config=self.app_config_1)
-        category.save()
-        self.assertIsNone(category.main_image)
 
-        image = category.main_image = self.create_filer_image_object()
-        category.save()
-        category_from_db = BlogCategory.objects.get(id=category.pk)
-        self.assertEqual(category_from_db.main_image, image)
+class KnockerTest(BaseTest):
 
-        image.delete()
-        category_from_db = BlogCategory.objects.get(id=category.pk)
-        self.assertIsNone(category_from_db.main_image)
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import knocker
+            super(KnockerTest, cls).setUpClass()
+        except ImportError:
+            raise SkipTest('django-knocker not installed, skipping tests')
+
+    def test_model_attributes(self):
+        self.get_pages()
+        posts = self.get_posts()
+
+        for language in posts[0].get_available_languages():
+            with smart_override(language):
+                posts[0].set_current_language(language)
+                knock_create = posts[0].as_knock(True)
+                self.assertEqual(knock_create['title'],
+                                 'new {0}'.format(posts[0]._meta.verbose_name))
+                self.assertEqual(knock_create['message'], posts[0].title)
+                self.assertEqual(knock_create['language'], language)
+
+        for language in posts[0].get_available_languages():
+            with smart_override(language):
+                posts[0].set_current_language(language)
+                knock_create = posts[0].as_knock(False)
+                self.assertEqual(knock_create['title'],
+                                 'new {0}'.format(posts[0]._meta.verbose_name))
+                self.assertEqual(knock_create['message'], posts[0].title)
+                self.assertEqual(knock_create['language'], language)
+
+    def test_should_knock(self):
+        self.get_pages()
+
+        post_data = {
+            'author': self.user,
+            'title': 'post 1',
+            'abstract': 'post 1',
+            'meta_description': 'post 1',
+            'meta_keywords': 'post 1',
+            'app_config': self.app_config_1
+        }
+        post = Post.objects.create(**post_data)
+        # Object is not published, no knock
+        self.assertFalse(post.should_knock())
+        post.publish = True
+        post.save()
+        # Object is published, send knock
+        self.assertTrue(post.should_knock())
+
+        # Knock disabled for updates
+        self.app_config_1.app_data.config.send_knock_update = False
+        self.app_config_1.save()
+        post.abstract = 'what'
+        post.save()
+        self.assertFalse(post.should_knock())
+
+        # Knock disabled for publishing
+        self.app_config_1.app_data.config.send_knock_create = False
+        self.app_config_1.save()
+        post_data = {
+            'author': self.user,
+            'title': 'post 2',
+            'abstract': 'post 2',
+            'meta_description': 'post 2',
+            'meta_keywords': 'post 2',
+            'app_config': self.app_config_1
+        }
+        post = Post.objects.create(**post_data)
+        self.assertFalse(post.should_knock())
+        post.publish = True
+        post.save()
+        self.assertFalse(post.should_knock())
+
+        # Restore default values
+        self.app_config_1.app_data.config.send_knock_create = True
+        self.app_config_1.app_data.config.send_knock_update = True
+        self.app_config_1.save()

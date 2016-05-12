@@ -10,7 +10,7 @@ MENU_TYPE_NONE = 'none'
 def get_setting(name):
     from django.conf import settings
     from django.utils.translation import ugettext_lazy as _
-    from meta_mixin import settings as meta_settings
+    from meta import settings as meta_settings
 
     PERMALINKS = (
         ('full_date', _('Full date')),
@@ -121,6 +121,14 @@ def get_setting(name):
             settings, 'BLOG_CATEGORY_PLUGIN_NAME', _('Categories')),
         'BLOG_ARCHIVE_PLUGIN_NAME': getattr(
             settings, 'BLOG_ARCHIVE_PLUGIN_NAME', _('Archive')),
+        'BLOG_FEED_CACHE_TIMEOUT': getattr(
+            settings, 'BLOG_FEED_CACHE_TIMEOUT', 3600),
+        'BLOG_FEED_INSTANT_ITEMS': getattr(
+            settings, 'BLOG_FEED_INSTANT_ITEMS', 50),
+        'BLOG_FEED_LATEST_ITEMS': getattr(
+            settings, 'BLOG_FEED_LATEST_ITEMS', 10),
+        'BLOG_FEED_TAGS_ITEMS': getattr(
+            settings, 'BLOG_FEED_TAGS_ITEMS', 10),
 
     }
     return default['BLOG_%s' % name]

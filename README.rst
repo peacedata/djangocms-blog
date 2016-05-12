@@ -37,11 +37,16 @@ Supported Django versions:
 * Django 1.6
 * Django 1.7
 * Django 1.8
+* Django 1.9
 
 Supported django CMS versions:
 
 * django CMS 3.x
 
+.. warning:: Starting from version 0.8, date_published is not set anymore
+             when creating a post but rather when publishing.
+             This does not change the overall behavior, but be warned if you
+             expect it to be not null in custom code.
 
 .. warning:: Version 0.6 changes the field of LatestPostsPlugin.tags field.
              A datamigration is in place to migrate the data, but check that
@@ -49,13 +54,6 @@ Supported django CMS versions:
              some relevant data.
              Some plugins have a broken tag management prior to 0.6, in case
              you have issues with tags, upgrade to latest version to have it fixed.
-
-.. warning:: When upgrading to version 0.6, check that every post has an attached
-             category, or select a menu without categories.
-
-.. warning:: Starting from version 0.5, this package does not declare dependency
-             on South anymore; please install it separately if using this
-             application on Django 1.6.
 
 Features
 --------
@@ -99,7 +97,6 @@ Add ``djangocms_blog`` and its dependencies to INSTALLED_APPS::
         'taggit',
         'taggit_autosuggest',
         'meta',
-        'meta_mixin',
         'djangocms_blog',
         ...
     ]
@@ -235,6 +232,30 @@ like the following in the project settings::
 
 And change ``post/`` with the desired prefix.
 
+Attaching blog to the home page
++++++++++++++++++++++++++++++++
+
+If you want to attach the blog to the home page you have to adapt settings a bit otherwise the
+"Just slug" permalink will swallow any CMS page you create.
+
+To avoit this add the following settings to you project::
+
+    BLOG_PERMALINKS = (
+        ('full_date', _('Full date')),
+        ('short_date', _('Year /  Month')),
+        ('category', _('Category')),
+    )
+    BLOG_PERMALINKS_URLS = {
+        'full_date': r'^(?P<year>\d{4})/(?P<month>\d{1,2})/(?P<day>\d{1,2})/(?P<slug>\w[-\w]*)/$',
+        'short_date': r'^(?P<year>\d{4})/(?P<month>\d{1,2})/(?P<slug>\w[-\w]*)/$',
+        'category': r'^(?P<category>\w[-\w]*)/(?P<slug>\w[-\w]*)/$',
+    }
+
+Notice that the last permalink type is no longer present.
+
+Then, pick any of the three remaining permalink types in the layout section of the apphooks config
+linked ot the home page (see http://yoursite.com/admin/djangocms_blog/blogconfig/).'
+
 Menu
 ++++
 
@@ -319,6 +340,28 @@ To add the blog Sitemap, add the following code to the project ``urls.py``::
         }),
     )
 
+Multisite
++++++++++
+
+django CMS blog provides full support for multisite setups.
+
+Each blog post can be assigned to none, one or more sites: if no site is selected, then
+it's visible on all sites.
+
+This is matched with and API that allows to restrict users to only be able to edit
+blog posts only for some sites.
+
+To implement this API, you must add a ``get_sites`` method on the user model which
+returns a queryset of sites the user is allowed to add posts to.
+
+Example::
+
+    class CustomUser(AbstractUser):
+        sites = models.ManyToManyField('sites.Site')
+
+        def get_sites(self):
+            return self.sites
+
 
 django CMS 3.2+ Wizard
 ++++++++++++++++++++++
@@ -328,6 +371,19 @@ content types, such as blog posts.
 
 For each configured Apphook, a content type is added to the wizard.
 
+Some issues with multiple registrations raising django CMS ``AlreadyRegisteredException``
+hae been reported; to handle these cases gracefully, the exception is swallowed
+when Django ``DEBUG == True`` avoiding breaking production websites. In these cases they
+wizard may not show up, but the rest will work as intended.
+
+django-knocker
+++++++++++++++
+
+``djangocms-blog`` is integrated with `django-knocker <https://github.com/nephila/django-knocker>`_
+to provide real time desktop notifications.
+
+See `django-knocker documentation <https://django-knocker.readthedocs.org/>`_ for how to configure
+knocker.
 
 .. _settings:
 
@@ -414,6 +470,10 @@ Global Settings
 * BLOG_TAGS_PLUGIN_NAME: Blog tags plugin name (default: ``Tags``)
 * BLOG_CATEGORY_PLUGIN_NAME: Blog categories plugin name (default: ``Categories``)
 * BLOG_ARCHIVE_PLUGIN_NAME: Blog archive plugin name (default: ``Archive``)
+* BLOG_FEED_CACHE_TIMEOUT: Cache timeout for RSS feeds
+* BLOG_FEED_INSTANT_ITEMS: Number of items in Instant Article feed
+* BLOG_FEED_LATEST_ITEMS: Number of items in latest items feed
+* BLOG_FEED_TAGS_ITEMS: Number of items in per tags feed
 
 Read-only settings
 ++++++++++++++++++
@@ -453,6 +513,8 @@ Per-Apphook settings
 * Twitter author handle: Per-Apphook setting for BLOG_TWITTER_AUTHOR
 * Google+ type: Per-Apphook setting for BLOG_GPLUS_TYPE
 * Google+ author name: Per-Apphook setting for BLOG_GPLUS_AUTHOR
+* Send notifications on post publish: Send desktop notifications when a post is published
+* Send notifications on post update: Send desktop notifications when a post is updated
 
 
 Import from Wordpress

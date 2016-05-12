@@ -3,7 +3,21 @@
 History
 -------
 
-0.7.0 (unreleased)
+0.8.0 (unreleased)
+++++++++++++++++++
+
+* Added django-knocker integration
+* Changed the default value of date_published to null
+* Cleared menu cache when changing menu layout in apphook config
+* Fixed error with wizard multiple registration
+* Made django CMS 3.2 the default version
+* Fixed error with on_site filter
+* Removed meta-mixin compatibility code
+* Changed slug size to 255 chars
+* Fixed pagination setting in list views
+* Added API to set default sites if user has permission only for a subset of sites
+
+0.7.0 (2016-03-19)
 ++++++++++++++++++
 
 * Make categories non required
@@ -16,6 +30,8 @@ History
 * Add support for moved ThumbnailOption
 * Fix Django 1.9 issues
 * Fix copy relations method in plugins
+* Mitigate issue when apphook config can't be retrieved
+* Mitigate issue when wizard double registration is triggered
 
 0.6.3 (2015-12-22)
 ++++++++++++++++++

@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, print_function, unicode_literals
 
+import warnings
+
 from cms.utils.permissions import get_current_user
+from django import forms
+from django.conf import settings
+from django.utils.text import slugify
+from django.utils.translation import ugettext_lazy as _
 
 try:
     from cms.wizards.wizard_base import Wizard
-    from cms.wizards.wizard_pool import wizard_pool
-    from django import forms
-    from django.utils.text import slugify
-    from django.utils.translation import ugettext_lazy as _
+    from cms.wizards.wizard_pool import wizard_pool, AlreadyRegisteredException
     from parler.forms import TranslatableModelForm
 
     from .cms_appconfig import BlogConfig
@@ -45,8 +48,9 @@ try:
         pass
 
     for config in BlogConfig.objects.all().order_by('namespace'):
-        new_wizard = type(str(slugify(config.app_title)), (PostWizard,), {})
-        new_form = type(str('{0}Form').format(slugify(config.app_title)), (PostWizardForm,), {
+        seed = slugify('{0}.{1}'.format(config.app_title, config.namespace))
+        new_wizard = type(str(seed), (PostWizard,), {})
+        new_form = type(str('{0}Form').format(seed), (PostWizardForm,), {
             'default_appconfig': config.pk
         })
         post_wizard = new_wizard(
@@ -56,7 +60,15 @@ try:
             model=Post,
             description=_('Create a new {0} in {1}').format(config.object_name, config.app_title),
         )
-        wizard_pool.register(post_wizard)
+        try:
+            wizard_pool.register(post_wizard)
+        except AlreadyRegisteredException:  # pragma: no cover
+            if settings.DEBUG:
+                raise
+            else:
+                warnings.warn('Wizard {0} cannot be registered. Please make sure that '
+                              'BlogConfig.namespace {1} and BlogConfig.app_title {2} are'
+                              'unique together'.format(seed, config.namespace, config.app_title))
 except ImportError:
     # For django CMS version not supporting wizards just ignore this file
     pass

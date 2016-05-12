@@ -4,18 +4,20 @@ from __future__ import absolute_import, print_function, unicode_literals
 import os.path
 
 from aldryn_apphooks_config.utils import get_app_instance
+from cms.api import add_plugin
 from cms.toolbar.items import ModalItem
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 from django.core.urlresolvers import reverse
 from django.http import Http404
+from django.utils.encoding import force_text
 from django.utils.timezone import now
 from django.utils.translation import ugettext_lazy as _
 from parler.tests.utils import override_parler_settings
 from parler.utils.conf import add_default_language_settings
 from parler.utils.context import smart_override, switch_language
 
-from djangocms_blog.feeds import LatestEntriesFeed, TagFeed
+from djangocms_blog.feeds import FBInstantArticles, LatestEntriesFeed, TagFeed
 from djangocms_blog.models import BLOG_CURRENT_NAMESPACE
 from djangocms_blog.settings import get_setting
 from djangocms_blog.sitemaps import BlogSitemap
@@ -63,12 +65,16 @@ class ViewTest(BaseTest):
             view_obj.paginate_by = 1
             context = view_obj.get_context_data(object_list=view_obj.object_list)
             self.assertTrue(context['is_paginated'])
-            self.assertEqual(list(context['post_list']), [posts[2]])
+            self.assertEqual(list(context['post_list']), [posts[0]])
             self.assertEqual(context['paginator'].count, 3)
-            self.assertEqual(context['post_list'][0].title, 'Third post')
+            self.assertEqual(context['post_list'][0].title, 'First post')
             response = view_obj.render_to_response(context)
             self.assertContains(response, context['post_list'][0].get_absolute_url())
             self.assertEqual(getattr(request, BLOG_CURRENT_NAMESPACE), self.app_config_1)
+
+            posts[1].sites.add(self.site_2)
+            self.assertTrue(view_obj.get_queryset().count(), 2)
+            self.assertFalse(posts[1] in view_obj.get_queryset())
 
         with smart_override('it'):
             request = self.get_page_request(pages[1], self.user, lang='it', edit=True)
@@ -79,7 +85,7 @@ class ViewTest(BaseTest):
             view_obj.kwargs = {}
             view_obj.object_list = view_obj.get_queryset()
             context = view_obj.get_context_data(object_list=view_obj.object_list)
-            self.assertEqual(context['post_list'][0].title, 'Terzo post')
+            self.assertEqual(context['post_list'][0].title, 'Primo post')
             response = view_obj.render_to_response(context)
             self.assertContains(response, context['post_list'][0].get_absolute_url())
             blog_menu = request.toolbar.get_or_create_menu('djangocms_blog', _('Blog'))
@@ -244,9 +250,9 @@ class ViewTest(BaseTest):
             self.assertTrue(context['category'])
             self.assertEqual(context['category'], self.category_1)
             self.assertTrue(context['is_paginated'])
-            self.assertEqual(list(context['post_list']), [posts[2]])
+            self.assertEqual(list(context['post_list']), [posts[0]])
             self.assertEqual(context['paginator'].count, 3)
-            self.assertEqual(context['post_list'][0].title, 'Third post')
+            self.assertEqual(context['post_list'][0].title, 'First post')
 
             request = self.get_page_request(pages[1], self.user, edit=False)
             view_obj.request = request
@@ -273,9 +279,9 @@ class ViewTest(BaseTest):
             self.assertTrue(context['author'])
             self.assertEqual(context['author'], self.user)
             self.assertTrue(context['is_paginated'])
-            self.assertEqual(list(context['post_list']), [posts[2]])
+            self.assertEqual(list(context['post_list']), [posts[0]])
             self.assertEqual(context['paginator'].count, 3)
-            self.assertEqual(context['post_list'][0].title, 'Third post')
+            self.assertEqual(context['post_list'][0].title, 'First post')
 
             request = self.get_page_request(pages[1], self.user, edit=False)
             view_obj.request = request
@@ -305,14 +311,18 @@ class ViewTest(BaseTest):
             context = view_obj.get_context_data(object_list=view_obj.object_list)
             self.assertTrue(context['tagged_entries'], 'tag-2')
             self.assertTrue(context['is_paginated'])
-            self.assertEqual(list(context['post_list']), [posts[1]])
+            self.assertEqual(list(context['post_list']), [posts[0]])
             self.assertEqual(context['paginator'].count, 2)
-            self.assertEqual(context['post_list'][0].title, 'Second post')
+            self.assertEqual(context['post_list'][0].title, 'First post')
 
     def test_feed(self):
+        self.user.first_name = 'Admin'
+        self.user.last_name = 'User'
+        self.user.save()
         posts = self.get_posts()
         pages = self.get_pages()
         posts[0].tags.add('tag 1', 'tag 2', 'tag 3', 'tag 4')
+        posts[0].author = self.user
         posts[0].save()
         posts[1].tags.add('tag 6', 'tag 2', 'tag 5', 'tag 8')
         posts[1].save()
@@ -330,6 +340,7 @@ class ViewTest(BaseTest):
                 xml = feed(request)
                 self.assertContains(xml, posts[0].get_absolute_url())
                 self.assertContains(xml, 'Blog articles on example.com')
+                self.assertContains(xml, 'Admin User</dc:creator>')
 
         with smart_override('it'):
             with switch_language(posts[0], 'it'):
@@ -345,6 +356,42 @@ class ViewTest(BaseTest):
                 feed.namespace = self.app_config_1.namespace
                 feed.config = self.app_config_1
                 self.assertEqual(list(feed.items('tag-2')), [posts[0]])
+
+    def test_instant_articles(self):
+        self.user.first_name = 'Admin'
+        self.user.last_name = 'User'
+        self.user.save()
+        posts = self.get_posts()
+        pages = self.get_pages()
+        posts[0].tags.add('tag 1', 'tag 2', 'tag 3', 'tag 4')
+        posts[0].categories.add(self.category_1)
+        posts[0].author = self.user
+        posts[0].save()
+        add_plugin(
+            posts[0].content, 'TextPlugin', language='en', body='<h3>Ciao</h3><p></p><p>Ciao</p>'
+        )
+
+        with smart_override('en'):
+            with switch_language(posts[0], 'en'):
+                request = self.get_page_request(
+                    pages[1], self.user, path=posts[0].get_absolute_url()
+                )
+
+                feed = FBInstantArticles()
+                feed.namespace, feed.config = get_app_instance(request)
+                self.assertEqual(list(feed.items()), [posts[0]])
+                xml = feed(request)
+                self.assertContains(xml, '<guid>{0}</guid>'.format(posts[0].guid))
+                self.assertContains(xml, 'content:encoded')
+                self.assertContains(xml, 'class="op-published" datetime="{0}"'.format(
+                    posts[0].date_published.isoformat()
+                ))
+                self.assertContains(xml, '<link rel="canonical" href="{0}"/>'.format(
+                    posts[0].get_full_url()
+                ))
+                # Assert text transformation
+                self.assertContains(xml, '<h2>Ciao</h2><p>Ciao</p>')
+                self.assertContains(xml, '<a>Admin User</a>')
 
     def test_sitemap(self):
         posts = self.get_posts()
