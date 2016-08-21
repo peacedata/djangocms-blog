@@ -3,6 +3,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from cms.apphook_pool import apphook_pool
 from cms.menu_bases import CMSAttachMenu
+from django.contrib.sites.shortcuts import get_current_site
 from django.core.urlresolvers import resolve
 from django.db.models.signals import post_delete, post_save
 from django.utils.translation import get_language_from_request, ugettext_lazy as _
@@ -12,11 +13,6 @@ from menus.menu_pool import menu_pool
 from .cms_appconfig import BlogConfig
 from .models import BlogCategory, Post
 from .settings import MENU_TYPE_CATEGORIES, MENU_TYPE_COMPLETE, MENU_TYPE_POSTS, get_setting
-
-try:
-    from django.contrib.sites.shortcuts import get_current_site
-except ImportError:
-    from django.contrib.sites.models import get_current_site
 
 
 class BlogCategoryMenu(CMSAttachMenu):
@@ -52,33 +48,16 @@ class BlogCategoryMenu(CMSAttachMenu):
         if config and config.menu_structure in (MENU_TYPE_COMPLETE, MENU_TYPE_POSTS):
             posts_menu = True
 
-        if categories_menu:
-            categories = BlogCategory.objects
-            if config:
-                categories = categories.namespace(self.instance.application_namespace)
-            categories = categories.active_translations(language).distinct()
-            categories = categories.order_by('parent__id', 'translations__name')
-            for category in categories:
-                node = NavigationNode(
-                    category.name,
-                    category.get_absolute_url(),
-                    '{0}-{1}'.format(category.__class__.__name__, category.pk),
-                    (
-                        '{0}-{1}'.format(
-                            category.__class__.__name__, category.parent.id
-                        ) if category.parent else None
-                    )
-                )
-                nodes.append(node)
-
+        used_categories = []
         if posts_menu:
             posts = Post.objects
             if hasattr(self, 'instance') and self.instance:
-                posts = posts.namespace(self.instance.application_namespace)
+                posts = posts.namespace(self.instance.application_namespace).on_site()
             posts = posts.active_translations(language).distinct()
             for post in posts:
                 post_id = None
                 parent = None
+                used_categories.extend(post.categories.values_list('pk', flat=True))
                 if categories_menu:
                     category = post.categories.first()
                     if category:
@@ -94,6 +73,28 @@ class BlogCategoryMenu(CMSAttachMenu):
                         parent
                     )
                     nodes.append(node)
+
+        if categories_menu:
+            categories = BlogCategory.objects
+            if config:
+                categories = categories.namespace(self.instance.application_namespace)
+            if config and not config.menu_empty_categories:
+                categories = categories.filter(pk__in=used_categories)
+            else:
+                categories = categories.active_translations(language).distinct()
+            categories = categories.order_by('parent__id', 'translations__name')
+            for category in categories:
+                node = NavigationNode(
+                    category.name,
+                    category.get_absolute_url(),
+                    '{0}-{1}'.format(category.__class__.__name__, category.pk),
+                    (
+                        '{0}-{1}'.format(
+                            category.__class__.__name__, category.parent.id
+                        ) if category.parent else None
+                    )
+                )
+                nodes.append(node)
 
         return nodes
 
@@ -125,7 +126,14 @@ class BlogNavModifier(Modifier):
         if app and app.app_config:
             namespace = resolve(request.path).namespace
             config = app.get_config(namespace)
-        if config and config.menu_structure != MENU_TYPE_CATEGORIES:
+        try:
+            if config and (
+                    not isinstance(config, BlogConfig) or
+                    config.menu_structure != MENU_TYPE_CATEGORIES
+            ):
+                return nodes
+        except AttributeError:  # pragma: no cover
+            # in case `menu_structure` is not present in config
             return nodes
         if post_cut:
             return nodes

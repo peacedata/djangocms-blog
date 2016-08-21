@@ -12,13 +12,7 @@ from haystack.constants import DEFAULT_ALIAS
 from parler.utils.context import smart_override
 
 from djangocms_blog.cms_appconfig import BlogConfig
-from djangocms_blog.models import BlogCategory, Post
-
-try:
-    from filer.models import ThumbnailOption  # NOQA
-except ImportError:
-    from cmsplugin_filer_image.models import ThumbnailOption  # NOQA
-
+from djangocms_blog.models import BlogCategory, Post, ThumbnailOption
 
 User = get_user_model()
 
@@ -109,22 +103,26 @@ class BaseTest(BaseTestCase):
     @classmethod
     def setUpClass(cls):
         super(BaseTest, cls).setUpClass()
-        cls.thumb_1 = ThumbnailOption.objects.create(
+        cls.thumb_1, __ = ThumbnailOption.objects.get_or_create(
             name='base', width=100, height=100, crop=True, upscale=False
         )
-        cls.thumb_2 = ThumbnailOption.objects.create(
+        cls.thumb_2, __ = ThumbnailOption.objects.get_or_create(
             name='main', width=200, height=200, crop=False, upscale=False
         )
-        cls.app_config_1 = BlogConfig.objects.create(
-            namespace='sample_app', app_title='app1', object_name='Blog'
+        cls.app_config_1, __ = BlogConfig.objects.get_or_create(
+            namespace='sample_app'
         )
-        cls.app_config_2 = BlogConfig.objects.create(
-            namespace='sample_app2', app_title='app2', object_name='Article'
+        cls.app_config_2, __ = BlogConfig.objects.get_or_create(
+            namespace='sample_app2'
         )
+        cls.app_config_1.app_title = 'app1'
+        cls.app_config_1.object_name = 'Blog'
         cls.app_config_1.app_data.config.paginate_by = 1
         cls.app_config_1.app_data.config.send_knock_create = True
         cls.app_config_1.app_data.config.send_knock_update = True
         cls.app_config_1.save()
+        cls.app_config_2.app_title = 'app2'
+        cls.app_config_2.object_name = 'Article'
         cls.app_config_2.app_data.config.paginate_by = 2
         cls.app_config_2.app_data.config.send_knock_create = True
         cls.app_config_2.app_data.config.send_knock_update = True
@@ -133,20 +131,32 @@ class BaseTest(BaseTestCase):
             'sample_app': cls.app_config_1,
             'sample_app2': cls.app_config_2,
         }
-        cls.category_1 = BlogCategory.objects.create(name='category 1',
-                                                     app_config=cls.app_config_1)
+        cls.category_1 = BlogCategory.objects.create(
+            name='category 1', app_config=cls.app_config_1
+        )
         cls.category_1.set_current_language('it', initialize=True)
         cls.category_1.name = 'categoria 1'
         cls.category_1.save()
-        cls.site_2 = Site.objects.create(domain='http://example2.com', name='example 2')
+        cls.site_2, __ = Site.objects.get_or_create(domain='http://example2.com', name='example 2')
+        cls.site_3, __ = Site.objects.get_or_create(domain='http://example3.com', name='example 3')
         cache.clear()
 
     @classmethod
     def tearDownClass(cls):
-        super(BaseTest, cls).tearDownClass()
         BlogConfig.objects.all().delete()
         BlogCategory.objects.all().delete()
         ThumbnailOption.objects.all().delete()
+        cache.clear()
+        super(BaseTest, cls).tearDownClass()
+
+    def tearDown(self):
+        self.user.sites.clear()
+        for post in Post.objects.all():
+            post.sites.clear()
+            post.tags.clear()
+            post.categories.clear()
+        cache.clear()
+        super(BaseTest, self).tearDown()
 
     def _get_category(self, data, category=None, lang='en'):
         data = deepcopy(data)

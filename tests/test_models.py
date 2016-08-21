@@ -115,15 +115,51 @@ class AdminTest(BaseTest):
 
         # Add view only has an empty form - no type
         response = post_admin.add_view(request)
-        self.assertNotContains(response, '<input class="vTextField" id="id_name" maxlength="255" name="name" type="text" value="category 1" />')
+        self.assertNotContains(response, 'id="id_name" maxlength="255" name="name" type="text" value="category 1" />')
         self.assertContains(response, '<option value="%s">Blog / sample_app</option>' % self.app_config_1.pk)
 
         # Changeview is 'normal', with a few preselected items
         response = post_admin.change_view(request, str(self.category_1.pk))
-        # response.render()
-        # print(response.content.decode('utf-8'))
-        self.assertContains(response, '<input class="vTextField" id="id_name" maxlength="255" name="name" type="text" value="category 1" />')
+        self.assertContains(response, 'id="id_name" maxlength="255" name="name" type="text" value="category 1" />')
         self.assertContains(response, '<option value="%s" selected="selected">Blog / sample_app</option>' % self.app_config_1.pk)
+
+    def test_admin_category_parents(self):
+        category1 = BlogCategory.objects.create(name='tree category 1', app_config=self.app_config_1)
+        category2 = BlogCategory.objects.create(name='tree category 2', parent=category1, app_config=self.app_config_1)
+        category3 = BlogCategory.objects.create(name='tree category 3', parent=category2, app_config=self.app_config_1)
+        BlogCategory.objects.create(name='tree category 4', parent=category3, app_config=self.app_config_1)
+        BlogCategory.objects.create(name='category different branch', app_config=self.app_config_2)
+
+        post_admin = admin.site._registry[BlogCategory]
+        request = self.get_page_request('/', self.user, r'/en/blog/?app_config=%s' % self.app_config_1.pk, edit=False)
+
+        # Add view shows all the exising categories
+        response = post_admin.add_view(request)
+        self.assertContains(response, '<option value="1">category 1</option>')
+        self.assertContains(response, '<option value="2">tree category 1</option>')
+        self.assertContains(response, '<option value="3">tree category 2</option>')
+        self.assertContains(response, '<option value="4">tree category 3</option>')
+        self.assertContains(response, '<option value="5">tree category 4</option>')
+        self.assertNotContains(response, 'category different branch</option>')
+
+        # Changeview hides the children of the current category
+        response = post_admin.change_view(request, str(category2.pk))
+        self.assertContains(response, '<option value="1">category 1</option>')
+        self.assertContains(response, '<option value="2" selected="selected">tree category 1</option>')
+        self.assertNotContains(response, '<option value="3">tree category 2</option>')
+        self.assertNotContains(response, '<option value="4">tree category 3</option>')
+        self.assertNotContains(response, '<option value="5">tree category 4</option>')
+        self.assertNotContains(response, 'category different branch</option>')
+
+        # Test second apphook categories
+        request = self.get_page_request('/', self.user, r'/en/blog/?app_config=%s' % self.app_config_2.pk, edit=False)
+        response = post_admin.add_view(request)
+        self.assertNotContains(response, '<option value="1">category 1</option>')
+        self.assertNotContains(response, '<option value="2">tree category 1</option>')
+        self.assertNotContains(response, '<option value="3">tree category 2</option>')
+        self.assertNotContains(response, '<option value="4">tree category 3</option>')
+        self.assertNotContains(response, '<option value="5">tree category 4</option>')
+        self.assertContains(response, 'category different branch</option>')
 
     def test_admin_fieldsets(self):
         post_admin = admin.site._registry[Post]
@@ -314,6 +350,103 @@ class AdminTest(BaseTest):
                     modified_post = Post.objects.language('en').get(pk=post.pk)
                     self.assertEqual(modified_post.safe_translation_getter('post_text'), data['post_text'])
 
+    def test_admin_site(self):
+        pages = self.get_pages()
+        post = self._get_post(self._post_data[0]['en'])
+
+        # no restrictions, sites are assigned
+        with self.login_user_context(self.user):
+            data = {
+                'sites': [self.site_1.pk, self.site_2.pk], 'title': 'some title',
+                'app_config': self.app_config_1.pk
+            }
+            request = self.post_request(pages[0], 'en', user=self.user, data=data, path='/en/')
+            self.assertEquals(post.sites.count(), 0)
+            msg_mid = MessageMiddleware()
+            msg_mid.process_request(request)
+            post_admin = admin.site._registry[Post]
+            response = post_admin.change_view(request, str(post.pk))
+            self.assertEqual(response.status_code, 302)
+            post = self.reload_model(post)
+            self.assertEquals(post.sites.count(), 2)
+        post.sites.clear()
+        post = self.reload_model(post)
+
+        # user only allowed on 2 sites, can add both
+        self.user.sites.add(self.site_2)
+        self.user.sites.add(self.site_3)
+        post.sites.add(self.site_1)
+        post.sites.add(self.site_2)
+        self.user = self.reload_model(self.user)
+        with self.login_user_context(self.user):
+            data = {
+                'sites': [self.site_2.pk, self.site_3.pk], 'title': 'some title',
+                'app_config': self.app_config_1.pk
+            }
+            request = self.post_request(pages[0], 'en', user=self.user, data=data, path='/en/')
+            self.assertEquals(post.sites.count(), 2)
+            msg_mid = MessageMiddleware()
+            msg_mid.process_request(request)
+            post_admin = admin.site._registry[Post]
+            post_admin._sites = None
+            response = post_admin.change_view(request, str(post.pk))
+            self.assertEqual(response.status_code, 302)
+            post = self.reload_model(post)
+            self.assertEquals(post.sites.count(), 3)
+        self.user.sites.clear()
+        post.sites.clear()
+
+        # user only allowed on 2 sites, can remove one of his sites
+        post = self.reload_model(post)
+        post.sites.add(self.site_1)
+        post.sites.add(self.site_2)
+        post.sites.add(self.site_3)
+        self.user.sites.add(self.site_2)
+        self.user.sites.add(self.site_3)
+        with self.login_user_context(self.user):
+            data = {
+                'sites': [self.site_3.pk], 'title': 'some title',
+                'app_config': self.app_config_1.pk
+            }
+            request = self.post_request(pages[0], 'en', user=self.user, data=data, path='/en/')
+            self.assertEquals(post.sites.count(), 3)
+            msg_mid = MessageMiddleware()
+            msg_mid.process_request(request)
+            post_admin = admin.site._registry[Post]
+            post_admin._sites = None
+            response = post_admin.change_view(request, str(post.pk))
+            self.assertEqual(response.status_code, 302)
+            post = self.reload_model(post)
+            self.assertEquals(post.sites.count(), 2)
+        self.user.sites.clear()
+        post.sites.clear()
+
+        # user only allowed on 2 sites, if given sites is empty, the site with no permission on
+        # is kept
+        post = self.reload_model(post)
+        post.sites.add(self.site_1)
+        post.sites.add(self.site_3)
+        self.user.sites.add(self.site_2)
+        self.user.sites.add(self.site_3)
+        with self.login_user_context(self.user):
+            data = {
+                'sites': [], 'title': 'some title',
+                'app_config': self.app_config_1.pk
+            }
+            request = self.post_request(pages[0], 'en', user=self.user, data=data, path='/en/')
+            self.assertEquals(post.sites.count(), 2)
+            msg_mid = MessageMiddleware()
+            msg_mid.process_request(request)
+            post_admin = admin.site._registry[Post]
+            post_admin._sites = None
+            response = post_admin.change_view(request, str(post.pk))
+            self.assertEqual(response.status_code, 302)
+            post = self.reload_model(post)
+            self.assertEquals(post.sites.count(), 1)
+        self.user.sites.clear()
+        post.sites.clear()
+        post = self.reload_model(post)
+
     def test_admin_clear_menu(self):
         """
         Tests that after changing apphook config menu structure the menu content is different: new
@@ -340,6 +473,33 @@ class AdminTest(BaseTest):
 
 
 class ModelsTest(BaseTest):
+
+    def test_category_attributes(self):
+        posts = self.get_posts()
+        posts[0].publish = True
+        posts[0].save()
+        posts[1].publish = True
+        posts[1].save()
+        posts[1].sites.add(self.site_2)
+        new_category = BlogCategory.objects.create(
+            name='category 2', app_config=self.app_config_1
+        )
+        posts[1].categories.add(new_category)
+
+        with self.settings(SITE_ID=2):
+            self.assertEqual(new_category.count, 1)
+            self.assertEqual(self.category_1.count, 2)
+            self.assertEqual(new_category.count_all_sites, 1)
+            self.assertEqual(self.category_1.count_all_sites, 2)
+
+        # needed to clear cached properties
+        new_category = self.reload_model(new_category)
+        self.category_1 = self.reload_model(self.category_1)
+        with self.settings(SITE_ID=1):
+            self.assertEqual(new_category.count, 0)
+            self.assertEqual(self.category_1.count, 1)
+            self.assertEqual(new_category.count_all_sites, 1)
+            self.assertEqual(self.category_1.count_all_sites, 2)
 
     def test_model_attributes(self):
         self.get_pages()
@@ -514,7 +674,10 @@ class ModelsTest(BaseTest):
         # default queryset, published and unpublished posts
         months = Post.objects.get_months()
         for data in months:
-            self.assertEqual(data['date'].date(), now().replace(year=now().year, month=now().month, day=1).date())
+            self.assertEqual(
+                data['date'].date(),
+                now().replace(year=now().year, month=now().month, day=1).date()
+            )
             self.assertEqual(data['count'], 2)
 
         # custom queryset, only published
@@ -522,8 +685,29 @@ class ModelsTest(BaseTest):
         post1.save()
         months = Post.objects.get_months(Post.objects.published())
         for data in months:
-            self.assertEqual(data['date'].date(), now().replace(year=now().year, month=now().month, day=1).date())
+            self.assertEqual(
+                data['date'].date(),
+                now().replace(year=now().year, month=now().month, day=1).date()
+            )
             self.assertEqual(data['count'], 1)
+
+        # Move post to different site to filter it out
+        post2.sites.add(self.site_2)
+        months = Post.objects.get_months()
+        for data in months:
+            self.assertEqual(
+                data['date'].date(),
+                now().replace(year=now().year, month=now().month, day=1).date()
+            )
+            self.assertEqual(data['count'], 1)
+        months = Post.objects.get_months(current_site=False)
+        for data in months:
+            self.assertEqual(
+                data['date'].date(),
+                now().replace(year=now().year, month=now().month, day=1).date()
+            )
+            self.assertEqual(data['count'], 2)
+        post2.sites.clear()
 
         self.assertEqual(len(Post.objects.available()), 1)
 
@@ -535,6 +719,7 @@ class ModelsTest(BaseTest):
         self.assertEqual(len(Post.objects.published()), 1)
         self.assertEqual(len(Post.objects.published_future()), 2)
         self.assertEqual(len(Post.objects.archived()), 0)
+        self.assertEqual(len(Post.objects.archived(current_site=False)), 0)
 
         # If post is published but end publishing date is in the past
         post2.date_published = now().replace(year=now().year - 2, month=now().month, day=1)
@@ -543,10 +728,32 @@ class ModelsTest(BaseTest):
         self.assertEqual(len(Post.objects.available()), 2)
         self.assertEqual(len(Post.objects.published()), 1)
         self.assertEqual(len(Post.objects.archived()), 1)
+        self.assertEqual(len(Post.objects.archived(current_site=False)), 1)
+
+        # Move post to different site to filter it out
+        post2.sites.add(self.site_2)
+        self.assertEqual(len(Post.objects.archived()), 0)
+        self.assertEqual(len(Post.objects.archived(current_site=False)), 1)
+        self.assertEqual(len(Post.objects.available()), 1)
+        self.assertEqual(len(Post.objects.available(current_site=False)), 2)
+        self.assertEqual(len(Post.objects.published()), 1)
+
+        # publish post
+        post2.date_published = now() - timedelta(days=1)
+        post2.date_published_end = now() + timedelta(days=10)
+        post2.save()
+        self.assertEqual(len(Post.objects.archived()), 0)
+        self.assertEqual(len(Post.objects.archived(current_site=False)), 0)
+        self.assertEqual(len(Post.objects.available()), 1)
+        self.assertEqual(len(Post.objects.available(current_site=False)), 2)
+        self.assertEqual(len(Post.objects.published()), 1)
+        self.assertEqual(len(Post.objects.published(current_site=False)), 2)
 
         # counting with language fallback enabled
         self._get_post(self._post_data[0]['it'], post1, 'it')
-        self.assertEqual(len(Post.objects.filter_by_language('it')), 2)
+        self.assertEqual(len(Post.objects.filter_by_language('it')), 1)
+        self.assertEqual(len(Post.objects.filter_by_language('it', current_site=False)), 2)
+        post2.sites.clear()
 
         # No fallback
         parler.appsettings.PARLER_LANGUAGES['default']['hide_untranslated'] = True
@@ -609,7 +816,9 @@ class ModelsTest(BaseTest):
         request = self.get_page_request('/', AnonymousUser(), r'/en/blog/', edit=False)
         request_auth = self.get_page_request('/', self.user_staff, r'/en/blog/', edit=False)
         request_edit = self.get_page_request('/', self.user_staff, r'/en/blog/', edit=True)
-        plugin = add_plugin(post1.content, 'BlogLatestEntriesPlugin', language='en', app_config=self.app_config_1)
+        plugin = add_plugin(
+            post1.content, 'BlogLatestEntriesPlugin', language='en', app_config=self.app_config_1
+        )
         tag = Tag.objects.get(slug='tag-1')
         plugin.tags.add(tag)
         # unauthenticated users get no post
@@ -617,24 +826,33 @@ class ModelsTest(BaseTest):
         # staff users not in edit mode get no post
         self.assertEqual(len(plugin.get_posts(request_auth)), 0)
         # staff users in edit mode get the post
-        self.assertEqual(len(plugin.get_posts(request_edit)), 1)
+        self.assertEqual(len(plugin.get_posts(request_edit, published_only=False)), 1)
 
         post1.publish = True
         post1.save()
         self.assertEqual(len(plugin.get_posts(request)), 1)
+
+
+class ModelsTest2(BaseTest):
 
     def test_copy_plugin_latest(self):
         post1 = self._get_post(self._post_data[0]['en'])
         post2 = self._get_post(self._post_data[1]['en'])
         tag1 = Tag.objects.create(name='tag 1')
         tag2 = Tag.objects.create(name='tag 2')
-        plugin = add_plugin(post1.content, 'BlogLatestEntriesPlugin', language='en', app_config=self.app_config_1)
+        plugin = add_plugin(
+            post1.content, 'BlogLatestEntriesPlugin', language='en', app_config=self.app_config_1
+        )
         plugin.tags.add(tag1)
         plugin.tags.add(tag2)
         if CMS_30:
-            plugins = list(post1.content.cmsplugin_set.filter(language='en').order_by('tree_id', 'level', 'position'))
+            plugins = list(post1.content.cmsplugin_set.filter(language='en').order_by(
+                'tree_id', 'level', 'position'
+            ))
         else:
-            plugins = list(post1.content.cmsplugin_set.filter(language='en').order_by('path', 'depth', 'position'))
+            plugins = list(post1.content.cmsplugin_set.filter(language='en').order_by(
+                'path', 'depth', 'position'
+            ))
         copy_plugins_to(plugins, post2.content)
         new = downcast_plugins(post2.content.cmsplugin_set.all())
         self.assertEqual(set(new[0].tags.all()), set([tag1, tag2]))
@@ -644,7 +862,9 @@ class ModelsTest(BaseTest):
         post1 = self._get_post(self._post_data[0]['en'])
         post2 = self._get_post(self._post_data[1]['en'])
         request = self.get_page_request('/', AnonymousUser(), r'/en/blog/', edit=False)
-        plugin = add_plugin(post1.content, 'BlogAuthorPostsPlugin', language='en', app_config=self.app_config_1)
+        plugin = add_plugin(
+            post1.content, 'BlogAuthorPostsPlugin', language='en', app_config=self.app_config_1
+        )
         plugin.authors.add(self.user)
         self.assertEqual(len(plugin.get_posts(request)), 0)
         self.assertEqual(plugin.get_authors()[0].count, 0)
@@ -662,12 +882,18 @@ class ModelsTest(BaseTest):
     def test_copy_plugin_author(self):
         post1 = self._get_post(self._post_data[0]['en'])
         post2 = self._get_post(self._post_data[1]['en'])
-        plugin = add_plugin(post1.content, 'BlogAuthorPostsPlugin', language='en', app_config=self.app_config_1)
+        plugin = add_plugin(
+            post1.content, 'BlogAuthorPostsPlugin', language='en', app_config=self.app_config_1
+        )
         plugin.authors.add(self.user)
         if CMS_30:
-            plugins = list(post1.content.cmsplugin_set.filter(language='en').order_by('tree_id', 'level', 'position'))
+            plugins = list(post1.content.cmsplugin_set.filter(language='en').order_by(
+                'tree_id', 'level', 'position'
+            ))
         else:
-            plugins = list(post1.content.cmsplugin_set.filter(language='en').order_by('path', 'depth', 'position'))
+            plugins = list(post1.content.cmsplugin_set.filter(language='en').order_by(
+                'path', 'depth', 'position'
+            ))
         copy_plugins_to(plugins, post2.content)
         new = downcast_plugins(post2.content.cmsplugin_set.all())
         self.assertEqual(set(new[0].authors.all()), set([self.user]))
@@ -700,13 +926,19 @@ class ModelsTest(BaseTest):
 
         self.assertEqual(force_text(post1.categories.first()), 'category 1')
 
-        plugin = add_plugin(post1.content, 'BlogAuthorPostsPlugin', language='en', app_config=self.app_config_1)
+        plugin = add_plugin(
+            post1.content, 'BlogAuthorPostsPlugin', language='en', app_config=self.app_config_1
+        )
         self.assertEqual(force_text(plugin.__str__()), '5 latest articles by author')
 
-        plugin = add_plugin(post1.content, 'BlogLatestEntriesPlugin', language='en', app_config=self.app_config_1)
+        plugin = add_plugin(
+            post1.content, 'BlogLatestEntriesPlugin', language='en', app_config=self.app_config_1
+        )
         self.assertEqual(force_text(plugin.__str__()), '5 latest articles by tag')
 
-        plugin = add_plugin(post1.content, 'BlogArchivePlugin', language='en', app_config=self.app_config_1)
+        plugin = add_plugin(
+            post1.content, 'BlogArchivePlugin', language='en', app_config=self.app_config_1
+        )
         self.assertEqual(force_text(plugin.__str__()), 'generic blog plugin')
 
 

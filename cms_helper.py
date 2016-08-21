@@ -78,6 +78,7 @@ HELPER_SETTINGS = dict(
         ('blog.html', 'Blog template'),
     ),
     META_SITE_PROTOCOL='http',
+    META_USE_SITES=True,
     META_SITE_DOMAIN='example.com',
     META_USE_OG_PROPERTIES=True,
     META_USE_TWITTER_PROPERTIES=True,
@@ -88,11 +89,18 @@ HELPER_SETTINGS = dict(
         'filer.thumbnail_processors.scale_and_crop_with_subject_location',
         'easy_thumbnails.processors.filters',
     ),
+    USE_TZ=True,
+    TIME_ZONE='UTC',
     FILE_UPLOAD_TEMP_DIR=mkdtemp(),
     SITE_ID=1,
     HAYSTACK_CONNECTIONS={
         'default': {}
     },
+    CACHES={
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
 )
 
 try:
@@ -105,24 +113,14 @@ except ImportError:
     pass
 
 try:
-    import admin_enhancer  # pragma: no cover # NOQA
-    HELPER_SETTINGS['INSTALLED_APPS'].append('admin_enhancer')
-except ImportError:
-    pass
-
-try:
-    import meta_mixin  # pragma: no cover # NOQA
-    HELPER_SETTINGS['INSTALLED_APPS'].append('meta_mixin')
-except ImportError:
-    pass
-
-try:
     import knocker  # pragma: no cover # NOQA
     HELPER_SETTINGS['INSTALLED_APPS'].append('knocker')
+    HELPER_SETTINGS['INSTALLED_APPS'].append('channels')
+    HELPER_SETTINGS['INSTALLED_APPS'].append('djangocms_blog.liveblog',)
     HELPER_SETTINGS['CHANNEL_LAYERS'] = {
         'default': {
             'BACKEND': 'asgiref.inmemory.ChannelLayer',
-            'ROUTING': 'knocker.routing.channel_routing',
+            'ROUTING': 'tests.test_utils.routing.channel_routing',
         },
     }
 except ImportError:
@@ -133,6 +131,12 @@ os.environ['AUTH_USER_MODEL'] = 'tests.test_utils.CustomUser'
 def run():
     from djangocms_helper import runner
     runner.cms('djangocms_blog')
+
+
+def setup():
+    import sys
+    from djangocms_helper import runner
+    runner.setup('djangocms_blog', sys.modules[__name__], use_cms=True)
 
 if __name__ == '__main__':
     run()

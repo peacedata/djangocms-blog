@@ -26,5 +26,8 @@
     {% else %}
         <div class="blog-content">{% render_model post "post_text" "post_text" %}</div>
     {% endif %}
+    {% if view.liveblog_enabled %}
+        {% include "liveblog/includes/post_detail.html" %}
+    {% endif %}
 </article>
 {% endblock content_blog %}

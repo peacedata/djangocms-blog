@@ -5,10 +5,13 @@ from copy import deepcopy
 
 from aldryn_apphooks_config.admin import BaseAppHookConfig, ModelAppHookConfig
 from cms.admin.placeholderadmin import FrontendEditableAdminMixin, PlaceholderAdminMixin
+from cms.models import CMSPlugin
 from django import forms
+from django.apps import apps
 from django.conf import settings
 from django.conf.urls import url
 from django.contrib import admin
+from django.contrib.sites.models import Site
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect
 from django.utils.six import callable
@@ -16,7 +19,7 @@ from django.utils.translation import get_language_from_request, ugettext_lazy as
 from parler.admin import TranslatableAdmin
 
 from .cms_appconfig import BlogConfig
-from .forms import PostAdminForm
+from .forms import CategoryAdminForm, PostAdminForm
 from .models import BlogCategory, Post
 from .settings import get_setting
 
@@ -28,6 +31,10 @@ except ImportError:
 
 
 class BlogCategoryAdmin(EnhancedModelAdminMixin, ModelAppHookConfig, TranslatableAdmin):
+    form = CategoryAdminForm
+    list_display = [
+        'name', 'parent', 'app_config', 'all_languages_column',
+    ]
 
     def get_prepopulated_fields(self, request, obj=None):
         app_config_default = self._app_config_select(request, obj)
@@ -55,15 +62,16 @@ class PostAdmin(PlaceholderAdminMixin, FrontendEditableAdminMixin,
     enhance_exclude = ('main_image', 'tags')
     _fieldsets = [
         (None, {
-            'fields': [('title', 'categories', 'publish', 'app_config')]
+            'fields': [['title', 'categories', 'publish', 'app_config']]
         }),
         ('Info', {
-            'fields': (['slug', 'tags'],
-                       ('date_published', 'date_published_end', 'enable_comments')),
+            'fields': [['slug', 'tags'],
+                       ['date_published', 'date_published_end'],
+                       ['enable_comments']],
             'classes': ('collapse',)
         }),
         ('Images', {
-            'fields': (('main_image', 'main_image_thumbnail', 'main_image_full'),),
+            'fields': [['main_image', 'main_image_thumbnail', 'main_image_full']],
             'classes': ('collapse',)
         }),
         ('Videos', {
@@ -71,7 +79,7 @@ class PostAdmin(PlaceholderAdminMixin, FrontendEditableAdminMixin,
             'classes': ('collapse',)
         }),
         ('SEO', {
-            'fields': [('meta_description', 'meta_title', 'meta_keywords')],
+            'fields': [['meta_description', 'meta_title', 'meta_keywords']],
             'classes': ('collapse',)
         }),
     ]
@@ -91,6 +99,18 @@ class PostAdmin(PlaceholderAdminMixin, FrontendEditableAdminMixin,
         ]
         urls.extend(super(PostAdmin, self).get_urls())
         return urls
+
+    def post_add_plugin(self, request, obj1, obj2=None):
+        if isinstance(obj1, CMSPlugin):
+            plugin = obj1
+        elif isinstance(obj2, CMSPlugin):
+            plugin = obj2
+        if plugin.plugin_type in get_setting('LIVEBLOG_PLUGINS'):
+            plugin = plugin.move(plugin.get_siblings().first(), 'first-sibling')
+        if isinstance(obj1, CMSPlugin):
+            return super(PostAdmin, self).post_add_plugin(request, plugin)
+        elif isinstance(obj2, CMSPlugin):
+            return super(PostAdmin, self).post_add_plugin(request, obj1, plugin)
 
     def publish_post(self, request, pk):
         """
@@ -149,7 +169,7 @@ class PostAdmin(PlaceholderAdminMixin, FrontendEditableAdminMixin,
             try:
                 self._sites = request.user.get_sites()
             except AttributeError:  # pragma: no cover
-                self._sites = False
+                self._sites = Site.objects.none()
         return self._sites
 
     def _set_config_defaults(self, request, form, obj=None):
@@ -190,6 +210,8 @@ class PostAdmin(PlaceholderAdminMixin, FrontendEditableAdminMixin,
             fsets[1][1]['fields'][0].append('sites')
         if request.user.is_superuser:
             fsets[1][1]['fields'][0].append('author')
+        if apps.is_installed('djangocms_blog.liveblog'):
+            fsets[1][1]['fields'][2].append('enable_liveblog')
         filter_function = get_setting('ADMIN_POST_FIELDSET_FILTER')
         if callable(filter_function):
             fsets = filter_function(fsets, request, obj=obj)
@@ -207,13 +229,24 @@ class PostAdmin(PlaceholderAdminMixin, FrontendEditableAdminMixin,
         sites = self.get_restricted_sites(request)
         if sites and sites.exists():
             qs = qs.filter(sites__in=sites.all())
-        return qs
+        return qs.distinct()
 
     def save_related(self, request, form, formsets, change):
+        if self.get_restricted_sites(request).exists():
+            if 'sites' in form.cleaned_data:
+                form_sites = form.cleaned_data.get('sites', [])
+                removed = set(
+                    self.get_restricted_sites(request).all()
+                ).difference(form_sites)
+                diff_original = set(
+                    form.instance.sites.all()
+                ).difference(removed).union(form_sites)
+                form.cleaned_data['sites'] = diff_original
+            else:
+                form.instance.sites.add(
+                    *self.get_restricted_sites(request).all().values_list('pk', flat=True)
+                )
         super(PostAdmin, self).save_related(request, form, formsets, change)
-        obj = form.instance
-        sites = self.get_restricted_sites(request)
-        obj.sites = sites.all()
 
     class Media:
         css = {
@@ -244,7 +277,7 @@ class BlogConfigAdmin(BaseAppHookConfig, TranslatableAdmin):
             ('Layout', {
                 'fields': (
                     'config.paginate_by', 'config.url_patterns', 'config.template_prefix',
-                    'config.menu_structure',
+                    'config.menu_structure', 'config.menu_empty_categories',
                 ),
                 'classes': ('collapse',)
             }),

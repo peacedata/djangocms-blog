@@ -3,13 +3,14 @@
 # 
 # Translators:
 # Christoph Reimers <christoph@superservice-international.com>, 2014
+# fsbraun <fsbraun@gmx.de>, 2016
 msgid ""
 msgstr ""
 "Project-Id-Version: djangocms-blog\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2015-12-20 17:14+0100\n"
-"PO-Revision-Date: 2015-12-20 16:15+0000\n"
-"Last-Translator: yakky <i.spalletti@nephila.it>\n"
+"POT-Creation-Date: 2016-05-05 08:48+0200\n"
+"PO-Revision-Date: 2016-05-25 21:05+0000\n"
+"Last-Translator: fsbraun <fsbraun@gmx.de>\n"
 "Language-Team: German (http://www.transifex.com/nephila/djangocms-blog/language/de/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -18,135 +19,135 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Lokalize 1.5\n"
 
-#: admin.py:169 admin.py:177 admin.py:185
+#: admin.py:217 admin.py:225 admin.py:233
 msgid "You can provide plain strings, Post model attribute or method names"
-msgstr ""
+msgstr "Strings und Post-Attribute oder -Methoden erlaubt"
 
 #: apps.py:15
 msgid "django CMS Blog"
-msgstr ""
+msgstr "django CMS Blog"
 
-#: cms_app.py:15 cms_toolbar.py:19 settings.py:111
+#: cms_app.py:15 cms_toolbar.py:20 settings.py:113
 msgid "Blog"
 msgstr "Blog"
 
 #: cms_appconfig.py:20
 msgid "application title"
-msgstr ""
+msgstr "Name der Anwendung"
 
 #: cms_appconfig.py:22
 msgid "object name"
-msgstr ""
+msgstr "Objektbezeichnung"
 
 #: cms_appconfig.py:27
 #| msgid "blog categories"
 msgid "blog config"
-msgstr ""
+msgstr "Einstellung"
 
 #: cms_appconfig.py:28
 #| msgid "blog categories"
 msgid "blog configs"
-msgstr ""
+msgstr "Einstellungen"
 
 #: cms_appconfig.py:31
 msgid "untitled"
-msgstr ""
+msgstr "unbenannt"
 
 #: cms_appconfig.py:36
 msgid "Post published by default"
-msgstr ""
+msgstr "Beitrag standardmäßig veröffentlichen"
 
 #: cms_appconfig.py:40
 msgid "Permalink structure"
-msgstr ""
+msgstr "Permalink-Struktur"
 
 #: cms_appconfig.py:45
 msgid "Use placeholder and plugins for article body"
-msgstr ""
+msgstr "Placeholder und Plugins für Beitrag verwenden"
 
 #: cms_appconfig.py:49
 msgid "Use abstract field"
-msgstr ""
+msgstr "Zusammenfassung nutzen"
 
 #: cms_appconfig.py:53
 msgid "Set author"
-msgstr ""
+msgstr "Autoren eintragen"
 
 #: cms_appconfig.py:53
 msgid "Set author by default"
-msgstr ""
+msgstr "Autoren standardmäßig eintragen"
 
 #: cms_appconfig.py:57
 msgid "Paginate size"
-msgstr ""
+msgstr "Beiträge pro Seite"
 
 #: cms_appconfig.py:58
 msgid "When paginating list views, how many articles per page?"
-msgstr ""
+msgstr "Anzahl der Beiträge, ab der die Beitragsübersicht in Seiten geteilt wird."
 
 #: cms_appconfig.py:61
 msgid "Template prefix"
-msgstr ""
+msgstr "Template-Prefix"
 
 #: cms_appconfig.py:62
 msgid "Alternative directory to load the blog templates from"
-msgstr ""
+msgstr "Alternativer Ordner, aus dem die Templates für diesen Blog geladen werden"
 
 #: cms_appconfig.py:65
 msgid "Menu structure"
-msgstr ""
+msgstr "Menüstruktur"
 
 #: cms_appconfig.py:67
 msgid "Structure of the django CMS menu"
-msgstr ""
+msgstr "Aufbau des Django CMS-Menü"
 
 #: cms_appconfig.py:70
 msgid "Sitemap changefreq"
-msgstr ""
+msgstr "Sitemap-Anpassungen"
 
 #: cms_appconfig.py:73
 msgid "Changefreq attribute for sitemap items"
-msgstr ""
+msgstr "Anpassungsfrequenz-Einstellung für Sitemap-Einträge"
 
 #: cms_appconfig.py:76
 msgid "Sitemap priority"
-msgstr ""
+msgstr "Sitemap-Priorität"
 
 #: cms_appconfig.py:78
 msgid "Priority attribute for sitemap items"
-msgstr ""
+msgstr "Prioritäts-Einstellung für Sitemap-Einträge"
 
 #: cms_appconfig.py:81
 msgid "Object type"
-msgstr ""
+msgstr "Objekt-Typ"
 
 #: cms_appconfig.py:85
 msgid "Facebook type"
-msgstr ""
+msgstr "Facebook-Typ"
 
 #: cms_appconfig.py:89
 msgid "Facebook application ID"
-msgstr ""
+msgstr "Facebook Application ID"
 
 #: cms_appconfig.py:93
 msgid "Facebook profile ID"
-msgstr ""
+msgstr "Facebook Profil-ID"
 
 #: cms_appconfig.py:97
 msgid "Facebook page URL"
-msgstr ""
+msgstr "Facebook Seiten-URL"
 
 #: cms_appconfig.py:101
 msgid "Facebook author URL"
-msgstr ""
+msgstr "Facebook Autoren-URL"
 
 #: cms_appconfig.py:105
 msgid "Facebook author"
-msgstr ""
+msgstr "Facebook Autor"
 
 #: cms_appconfig.py:109
 msgid "Twitter type"
-msgstr ""
+msgstr "Twitter-Typ"
 
 #: cms_appconfig.py:113
 msgid "Twitter site handle"
@@ -158,222 +159,244 @@ msgstr ""
 
 #: cms_appconfig.py:121
 msgid "Google+ type"
-msgstr ""
+msgstr "Google+ Typ"
 
 #: cms_appconfig.py:125
 msgid "Google+ author name"
-msgstr ""
+msgstr "Google+ Autoren-Name"
 
-#: cms_toolbar.py:22
+#: cms_appconfig.py:130
+msgid "Send notifications on post publish"
+msgstr "Mitteilung bei Veröffentlichungen senden"
+
+#: cms_appconfig.py:131
+msgid "Emits a desktop notification -if enabled- when publishing a new post"
+msgstr "Wenn aktiviert: Desktop-Mitteilung senden, wenn Beiträge veröffentlicht werden"
+
+#: cms_appconfig.py:134
+msgid "Send notifications on post update"
+msgstr "Mitteilung bei Aktualisierungen senden"
+
+#: cms_appconfig.py:135
+msgid ""
+"Emits a desktop notification -if enabled- when editing a published post"
+msgstr "Wenn aktiviert: Desktop-Mitteilung senden, wenn Beiträge aktualisiert werden"
+
+#: cms_menus.py:28
+msgid "Blog menu"
+msgstr "Blog-Menü"
+
+#: cms_toolbar.py:23
 msgid "Post list"
 msgstr "Post Liste"
 
-#: cms_toolbar.py:24
+#: cms_toolbar.py:25
 msgid "Add post"
 msgstr "Post hinzufügen"
 
-#: cms_toolbar.py:28
+#: cms_toolbar.py:29
 msgid "Edit configuration"
-msgstr ""
+msgstr "Einstellungen bearbeiten"
 
-#: cms_toolbar.py:32
+#: cms_toolbar.py:33
 msgid "Edit Post"
 msgstr "Post bearbeiten"
 
-#: cms_wizards.py:47
+#: cms_toolbar.py:47
+#, python-brace-format
+msgid "Publish {0} now"
+msgstr "{0} jetzt veröffentlichen"
+
+#: cms_wizards.py:57
 #, python-brace-format
 msgid "New {0}"
-msgstr ""
+msgstr "Neuer {0}"
 
-#: cms_wizards.py:51
+#: cms_wizards.py:61
 #, python-brace-format
 msgid "Create a new {0} in {1}"
-msgstr ""
+msgstr "Neuen {0} in {1} erstellen"
 
-#: feeds.py:24
+#: feeds.py:48
 #, python-format
 msgid "Blog articles on %(site_name)s"
 msgstr "Blog-Artikel auf %(site_name)s"
 
-#: menu.py:16
-msgid "Blog menu"
-msgstr ""
-
-#: models.py:34
+#: models.py:57
 msgid "parent"
 msgstr "übergeordnetes Element"
 
-#: models.py:35
+#: models.py:58
 msgid "created at"
 msgstr "erstellt am"
 
-#: models.py:36
+#: models.py:59
 msgid "modified at"
 msgstr "bearbeitet am"
 
-#: models.py:38 models.py:123 models.py:275
+#: models.py:61 models.py:144 models.py:353
 msgid "app. config"
-msgstr ""
+msgstr "App-Einstellung"
 
-#: models.py:42
+#: models.py:65
 msgid "name"
 msgstr "Name"
 
-#: models.py:43 models.py:128
+#: models.py:66 models.py:149
 msgid "slug"
 msgstr "slug"
 
-#: models.py:50
+#: models.py:73
 msgid "blog category"
 msgstr "Blog-Kategorie"
 
-#: models.py:51
+#: models.py:74
 msgid "blog categories"
 msgstr "Blog-Kategorien"
 
-#: models.py:91
+#: models.py:114
 msgid "author"
-msgstr ""
+msgstr "Autor"
 
-#: models.py:94
+#: models.py:117
 msgid "created"
-msgstr ""
+msgstr "erstellt"
 
-#: models.py:95
+#: models.py:118
 msgid "last modified"
-msgstr ""
+msgstr "zuletzt geändert"
 
-#: models.py:96
+#: models.py:119
 msgid "published since"
-msgstr ""
+msgstr "öffentlich seit"
 
-#: models.py:98
+#: models.py:120
 msgid "published until"
-msgstr ""
+msgstr "öffentlich bis"
 
-#: models.py:100
+#: models.py:121
 msgid "publish"
-msgstr ""
+msgstr "veröffentlicht"
 
-#: models.py:101
+#: models.py:122
 msgid "category"
 msgstr "Kategorie"
 
-#: models.py:103
+#: models.py:124
 msgid "main image"
-msgstr ""
+msgstr "Beitragsbild"
 
-#: models.py:107
+#: models.py:128
 msgid "main image thumbnail"
-msgstr ""
+msgstr "Beitragsbild (Vorschau)"
 
-#: models.py:112
+#: models.py:133
 msgid "main image full"
-msgstr ""
+msgstr "Beitragsbild (volle Größe)"
 
-#: models.py:116
+#: models.py:137
 msgid "enable comments on post"
-msgstr ""
+msgstr "Kommentare zu diesem Beitrag erlauben"
 
-#: models.py:118
+#: models.py:139
 msgid "Site(s)"
 msgstr "Seite(n)"
 
-#: models.py:119
+#: models.py:140
 msgid ""
 "Select sites in which to show the post. If none is set it will be visible in"
 " all the configured sites."
 msgstr "Wähle Seiten aus, auf welchen der Post angezeigt wird. Ohne Auswahl sichtbar auf allen konfigurierten Seiten."
 
-#: models.py:127
+#: models.py:148
 msgid "title"
-msgstr ""
+msgstr "Titel"
 
-#: models.py:129
+#: models.py:150
 msgid "abstract"
-msgstr ""
+msgstr "Zusammenfassung"
 
-#: models.py:130
+#: models.py:151
 msgid "post meta description"
-msgstr ""
+msgstr "Meta-Beschreibung"
 
-#: models.py:132
+#: models.py:153
 msgid "post meta keywords"
-msgstr ""
+msgstr "Meta-Stichwörter"
 
-#: models.py:134
+#: models.py:155
 msgid "post meta title"
-msgstr ""
+msgstr "Meta-Titel"
 
-#: models.py:135
+#: models.py:156
 msgid "used in title tag and social sharing"
 msgstr "Wird im Titel-Tag und für das soziale Teilen genutzt"
 
-#: models.py:138
+#: models.py:159
 msgid "text"
-msgstr ""
+msgstr "Text"
 
-#: models.py:175
+#: models.py:196
 msgid "blog article"
 msgstr "Blog-Artikel"
 
-#: models.py:176
+#: models.py:197
 msgid "blog articles"
 msgstr "Blog-Artikel"
 
-#: models.py:294 models.py:328
+#: models.py:372 models.py:408
 msgid "articles"
-msgstr ""
+msgstr "Beiträge"
 
-#: models.py:295
+#: models.py:373
 msgid "The number of latests articles to be displayed."
 msgstr "Anzahl der anzuzeigenden letzten Artikel"
 
-#: models.py:297
+#: models.py:375
 msgid "filter by tag"
-msgstr ""
+msgstr "Nach Schlagwort filtern"
 
-#: models.py:298
+#: models.py:376
 msgid "Show only the blog articles tagged with chosen tags."
 msgstr "Nur die Blog-Einträge mit dem ausgewählten Tag anzeigen"
 
-#: models.py:301
+#: models.py:379
 msgid "filter by category"
-msgstr ""
+msgstr "Nach Kategorie filtern"
 
-#: models.py:302
+#: models.py:380
 msgid "Show only the blog articles tagged with chosen categories."
 msgstr "Nur die Blog-Einträge der ausgewählten Kategorie anzeigen"
 
-#: models.py:306
+#: models.py:384
 #, python-format
 msgid "%s latest articles by tag"
-msgstr ""
+msgstr "%s neueste Beiträge nach Schlagwort"
 
-#: models.py:324
+#: models.py:404
 msgid "authors"
-msgstr ""
+msgstr "Autoren"
 
-#: models.py:329
+#: models.py:409
 msgid "The number of author articles to be displayed."
 msgstr "Die Anzahl der anzuzeigenden Autoren-Artikel"
 
-#: models.py:333
+#: models.py:413
 #, python-format
 msgid "%s latest articles by author"
-msgstr ""
+msgstr "%s neueste Beiträge nach Autor"
 
-#: models.py:362
+#: models.py:442
 msgid "generic blog plugin"
-msgstr ""
+msgstr "Generisches Blog-Plugin"
 
 #: settings.py:16
 msgid "Full date"
-msgstr ""
+msgstr "Jahr / Monat / Tag"
 
 #: settings.py:17
 msgid "Year /  Month"
-msgstr ""
+msgstr "Jahr / Monat"
 
 #: settings.py:18 templates/djangocms_blog/post_list.html:14
 msgid "Category"
@@ -381,69 +404,69 @@ msgstr "Kategorie"
 
 #: settings.py:19
 msgid "Just slug"
-msgstr ""
+msgstr "Nur Slug"
 
 #: settings.py:28
 msgid "Categories and posts"
-msgstr ""
+msgstr "Kategorien und Beiträge"
 
 #: settings.py:29
 msgid "Categories only"
-msgstr ""
+msgstr "Nur Kategorien"
 
 #: settings.py:30
 msgid "Posts only"
-msgstr ""
+msgstr "Nur Beiträge"
 
 #: settings.py:31
 msgid "None"
-msgstr ""
+msgstr "Kein Menü"
 
 #: settings.py:34
 msgid "always"
-msgstr ""
+msgstr "Fortlaufend"
 
 #: settings.py:35
 msgid "hourly"
-msgstr ""
+msgstr "Stündlich"
 
 #: settings.py:36
 msgid "daily"
-msgstr ""
+msgstr "Täglich"
 
 #: settings.py:37
 msgid "weekly"
-msgstr ""
+msgstr "Wöchentlich"
 
 #: settings.py:38
 msgid "monthly"
-msgstr ""
+msgstr "Monatlich"
 
 #: settings.py:39
 msgid "yearly"
-msgstr ""
+msgstr "Jährlich"
 
 #: settings.py:40
 msgid "never"
-msgstr ""
+msgstr "Nie"
 
-#: settings.py:113
+#: settings.py:115
 msgid "Latest Blog Articles"
 msgstr "Letzte Blog-Einträge"
 
-#: settings.py:115
+#: settings.py:117
 msgid "Author Blog Articles"
 msgstr "Autoren Blog-Artikel"
 
-#: settings.py:117 templates/djangocms_blog/plugins/tags.html:3
+#: settings.py:119 templates/djangocms_blog/plugins/tags.html:3
 msgid "Tags"
 msgstr "Tags"
 
-#: settings.py:119 templates/djangocms_blog/plugins/categories.html:3
+#: settings.py:121 templates/djangocms_blog/plugins/categories.html:3
 msgid "Categories"
 msgstr "Kategorien"
 
-#: settings.py:121 templates/djangocms_blog/plugins/archive.html:3
+#: settings.py:123 templates/djangocms_blog/plugins/archive.html:3
 #: templates/djangocms_blog/post_list.html:12
 msgid "Archive"
 msgstr "Archiv"
@@ -487,7 +510,7 @@ msgstr "Authoren"
 
 #: templates/djangocms_blog/plugins/categories.html:15
 msgid "No categories found."
-msgstr ""
+msgstr "Keine Kategorien gefunden."
 
 #: templates/djangocms_blog/post_list.html:11
 msgid "Articles by"

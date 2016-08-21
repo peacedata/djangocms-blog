@@ -58,6 +58,7 @@ def get_setting(name):
             settings, 'BLOG_POSTS_LIST_TRUNCWORDS_COUNT', 100
         ),
         'BLOG_MENU_TYPES': MENU_TYPES,
+        'BLOG_MENU_EMPTY_CATEGORIES': getattr(settings, 'MENU_EMPTY_CATEGORIES', True),
         'BLOG_TYPE': getattr(settings, 'BLOG_TYPE', 'Article'),
         'BLOG_TYPES': meta_settings.OBJECT_TYPES,
         'BLOG_FB_TYPE': getattr(settings, 'BLOG_FB_TYPE', 'Article'),
@@ -113,6 +114,8 @@ def get_setting(name):
         'BLOG_PLUGIN_MODULE_NAME': getattr(settings, 'BLOG_PLUGIN_MODULE_NAME', _('Blog')),
         'BLOG_LATEST_ENTRIES_PLUGIN_NAME': getattr(
             settings, 'BLOG_LATEST_ENTRIES_PLUGIN_NAME', _('Latest Blog Articles')),
+        'BLOG_LATEST_ENTRIES_PLUGIN_NAME_CACHED': getattr(
+            settings, 'BLOG_LATEST_ENTRIES_PLUGIN_NAME_CACHED', _('Latest Blog Articles - Cache')),
         'BLOG_AUTHOR_POSTS_PLUGIN_NAME': getattr(
             settings, 'BLOG_AUTHOR_POSTS_PLUGIN_NAME', _('Author Blog Articles')),
         'BLOG_TAGS_PLUGIN_NAME': getattr(
@@ -129,6 +132,11 @@ def get_setting(name):
             settings, 'BLOG_FEED_LATEST_ITEMS', 10),
         'BLOG_FEED_TAGS_ITEMS': getattr(
             settings, 'BLOG_FEED_TAGS_ITEMS', 10),
+        'BLOG_LIVEBLOG_PLUGINS': getattr(
+            settings, 'BLOG_LIVEBLOG_PLUGINS', ('LiveblogPlugin',)),
+
+        'BLOG_PLUGIN_TEMPLATE_FOLDERS': getattr(
+            settings, 'BLOG_PLUGIN_TEMPLATE_FOLDERS', (('plugins', _('Default template')),)),
 
     }
     return default['BLOG_%s' % name]
