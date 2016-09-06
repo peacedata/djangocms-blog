@@ -80,6 +80,7 @@ def get_setting(name):
         'BLOG_USE_PLACEHOLDER': getattr(settings, 'BLOG_USE_PLACEHOLDER', True),
         'BLOG_MULTISITE': getattr(settings, 'BLOG_MULTISITE', True),
         'BLOG_AUTHOR_DEFAULT': getattr(settings, 'BLOG_AUTHOR_DEFAULT', True),
+        'BLOG_USERNAME_FIELD': getattr(settings, 'BLOG_USERNAME_FIELD', None),
         'BLOG_DEFAULT_PUBLISHED': getattr(settings, 'BLOG_DEFAULT_PUBLISHED', False),
         'BLOG_ADMIN_POST_FIELDSET_FILTER': getattr(
             settings, 'BLOG_ADMIN_POST_FIELDSET_FILTER', False),

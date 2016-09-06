@@ -147,15 +147,16 @@ class TaggedListView(BaseBlogListView, ListView):
 
 class AuthorEntriesView(BaseBlogListView, ListView):
     view_url_name = 'djangocms_blog:posts-author'
+    username_field = get_setting('USERNAME_FIELD') or User.USERNAME_FIELD
 
     def get_queryset(self):
         qs = super(AuthorEntriesView, self).get_queryset()
         if 'username' in self.kwargs:
-            qs = qs.filter(**{'author__%s' % User.USERNAME_FIELD: self.kwargs['username']})
+            qs = qs.filter(**{'author__%s' % self.username_field: self.kwargs['username']})
         return qs
 
     def get_context_data(self, **kwargs):
-        kwargs['author'] = User.objects.get(**{User.USERNAME_FIELD: self.kwargs.get('username')})
+        kwargs['author'] = User.objects.get(**{self.username_field: self.kwargs.get('username')})
         context = super(AuthorEntriesView, self).get_context_data(**kwargs)
         return context
 
